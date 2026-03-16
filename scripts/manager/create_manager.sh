@@ -41,21 +41,24 @@ sysctl --system
 # install and dearmor support packages for docker
 apt update
 apt install -y curl gnupg2 software-properties-common apt-transport-https ca-certificates
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/trusted.gpg.d/docker.gpg
-add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
 
-# and packages for containerd
-apt update
-apt install -y containerd.io
+# curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/trusted.gpg.d/docker.gpg
+# add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
 
-#make sure not to rerun that every time (idempotency or smth)
-if [ ! -f /etc/containerd/config.toml ]; then
-    containerd config default > /etc/containerd/config.toml
-fi
+apt install -y containerd
 
-sed -i 's/SystemdCgroup \= false/SystemdCgroup \= true/g' /etc/containerd/config.toml
+mkdir -p /etc/containerd
+containerd config default > /etc/containerd/config.toml
+
+sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
+sed -i 's/disabled_plugins = \["cri"\]//' /etc/containerd/config.toml
+
 systemctl restart containerd
 systemctl enable containerd
+
+#sed -i 's/SystemdCgroup \= false/SystemdCgroup \= true/g' /etc/containerd/config.toml
+#systemctl restart containerd
+#systemctl enable containerd
 
 
 # get install kubernetes based on the version provided or default
@@ -72,15 +75,6 @@ if [ ! -f /etc/kubernetes/admin.conf ]; then
     kubeadm init --pod-network-cidr=$CLUSTER_CID
 fi
 
-# wait for the management plane to initiate in order to prevent race condition
-until kubectl get nodes >/dev/null 2>&1; do
-    sleep 2
-done
-
-# install and apply CNI (calico)
-KUBECONFIG=/etc/kubernetes/admin.conf kubectl apply -f \
-https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/calico.yaml
-
 # delegate ownership to the real user after the install 
 REAL_USER=${SUDO_USER:-$USER}
 REAL_HOME=$(eval echo "~$REAL_USER")
@@ -89,5 +83,40 @@ mkdir -p "$REAL_HOME/.kube"
 cp /etc/kubernetes/admin.conf "$REAL_HOME/.kube/config"
 chown "$REAL_USER:$REAL_USER" "$REAL_HOME/.kube/config"
 
+# wait for the management plane to initiate in order to prevent race condition
+until sudo -u $REAL_USER kubectl get nodes >/dev/null 2>&1; do
+    sleep 2
+done
+
+# install and apply CNI (calico)
+KUBECONFIG=/etc/kubernetes/admin.conf kubectl apply -f \
+https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/calico.yaml
+
 # lock versions after all the stuff is installed in order for the package updates not to break up the cluster
 apt-mark hold kubelet kubeadm kubectl
+
+echo "wainting for all pods to come up in kube-system namespace"
+
+while true; do
+    # get pod statuses
+    status_arr=($(sudo -u $REAL_USER kubectl get pods -n kube-system | awk 'NR > 1 {print $3}'))
+
+    all_running=true
+
+    for s in "${status_arr[@]}"; do
+        if [[ "$s" != "Running" ]]; then
+            all_running=false
+            break
+        fi
+    done
+
+    if $all_running; then
+        echo "All pods are running"
+        break
+    else
+        echo "Waiting for pods..."
+        sleep 5
+    fi
+done
+
+echo "pods running, setup finished"
