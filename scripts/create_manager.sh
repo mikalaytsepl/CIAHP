@@ -3,8 +3,8 @@ set -euo pipefail
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 KUBE_VERSION="${1:-1.35}"
-POD_CIDR="${2:-10.244.0.0/16}"
-CNI_MANIFEST="https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml"
+POD_CIDR="${2:-192.168.0.0/16}" # Updated to Calico's default CIDR
+CNI_MANIFEST="https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/calico.yaml"
 JOIN_TOKEN_FILE="/etc/kubernetes/join-command.sh"
 LOG_FILE="/var/log/k8s-manager-setup.log"
 INSTALL_KUBECTL="true"   # managers need kubectl; workers don't
@@ -47,15 +47,16 @@ else
 fi
 export KUBECONFIG=/etc/kubernetes/admin.conf
 
-# ─── 8. CNI — Flannel ────────────────────────────────────────────────────────
-step "cni-flannel"
-if kubectl get daemonset kube-flannel-ds -n kube-flannel \
+# ─── 8. CNI — Calico ─────────────────────────────────────────────────────────
+step "cni-calico"
+# Calico deploys the calico-node DaemonSet in the kube-system namespace
+if kubectl get daemonset calico-node -n kube-system \
     --kubeconfig=/etc/kubernetes/admin.conf &>/dev/null; then
-  skip "Flannel CNI already deployed."
+  skip "Calico CNI already deployed."
 else
   kubectl apply -f "${CNI_MANIFEST}" --kubeconfig=/etc/kubernetes/admin.conf \
     >> "$LOG_FILE" 2>&1
-  ok "Flannel CNI applied."
+  ok "Calico CNI applied."
 fi
 
 # ─── 9. Join token ───────────────────────────────────────────────────────────
