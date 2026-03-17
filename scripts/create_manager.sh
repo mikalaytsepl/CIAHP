@@ -95,28 +95,29 @@ https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/calico.
 # lock versions after all the stuff is installed in order for the package updates not to break up the cluster
 apt-mark hold kubelet kubeadm kubectl
 
-echo "wainting for all pods to come up in kube-system namespace"
+echo "Waiting for control plane pods..."
 
-while true; do
-    # get pod statuses
-    status_arr=($(sudo -u $REAL_USER kubectl get pods -n kube-system | awk 'NR > 1 {print $3}'))
+# Control plane (static pods)
+sudo -u $REAL_USER kubectl wait --for=condition=Ready pod -l component=etcd -n kube-system --timeout=300s
+sudo -u $REAL_USER kubectl wait --for=condition=Ready pod -l component=kube-apiserver -n kube-system --timeout=300s
+sudo -u $REAL_USER kubectl wait --for=condition=Ready pod -l component=kube-controller-manager -n kube-system --timeout=300s
+sudo -u $REAL_USER kubectl wait --for=condition=Ready pod -l component=kube-scheduler -n kube-system --timeout=300s
 
-    all_running=true
+echo "Control plane is ready"
 
-    for s in "${status_arr[@]}"; do
-        if [[ "$s" != "Running" ]]; then
-            all_running=false
-            break
-        fi
-    done
+echo "Waiting for CNI ..."
 
-    if $all_running; then
-        echo "All pods are running"
-        break
-    else
-        echo "Waiting for pods..."
-        sleep 5
-    fi
-done
+# Calico
+sudo -u $REAL_USER kubectl wait --for=condition=Ready pod -l k8s-app=calico-node -n kube-system --timeout=300s
+sudo -u $REAL_USER kubectl wait --for=condition=Ready pod -l k8s-app=calico-kube-controllers -n kube-system --timeout=300s
 
-echo "pods running, setup finished"
+echo "CNI is ready"
+
+echo "Waiting for DNS ..."
+
+# CoreDNS
+sudo -u $REAL_USER kubectl wait --for=condition=Ready pod -l k8s-app=kube-dns -n kube-system --timeout=300s
+
+echo "DNS is ready"
+
+echo "All systems ready. Cluster is operational"
