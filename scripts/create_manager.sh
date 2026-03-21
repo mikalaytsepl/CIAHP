@@ -20,6 +20,7 @@ sed -i '/^[^#]/s/^\(\S\+\s\+\S\+\s\+\)swap/\1swap/; /^[^#].*\s\+swap\s\+/s/^/# /
 
 
 #tee overwrites the things anyway so no point checkng
+mkdir -p /etc/modules-load.d
 tee /etc/modules-load.d/containerd.conf <<EOF
 overlay
 br_netfilter
