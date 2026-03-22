@@ -15,3 +15,4 @@
       ansible.builtin.script: scripts/create_manager.sh
       args:
         executable: /bin/bash
+        creates: /etc/kubernetes/admin.conf
