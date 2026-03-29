@@ -1,0 +1,27 @@
+---
+
+- name: Retrieve join command from manager
+  hosts: global_managers
+  become: true
+  tasks:
+    - name: Get token
+      ansible.builtin.command: kubeadm token create --print-join-command
+      register: join_command_raw
+
+    - name: Save to memory
+      ansible.builtin.set_fact:
+        worker_join_command: "{{ join_command_raw.stdout }}"
+
+- name: Deploy Worker Node
+  hosts: global_workers
+  become: true
+  tasks:
+    - name: Run General Setup Phase
+      ansible.builtin.script: ../../scripts/setup_scripts/general_setup.sh
+
+    - name: Run Worker Join Phase (Passing the token as an argument)
+      # Pass the variable dynamically into the bash script execution
+      ansible.builtin.script: >
+          ../../scripts/setup_scripts/create_worker.sh 
+          "{{ hostvars[groups['global_managers'][0]]['ansible_host'] }}" 
+          "{{ hostvars[groups['global_managers'][0]]['worker_join_command'] }}"
