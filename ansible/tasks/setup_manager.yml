@@ -1,0 +1,10 @@
+---
+
+- name: Deply manager
+  hosts: managers
+  remote_user: ansible
+  become: true
+
+  tasks: 
+    - name: Run general setup
+      ansible.builtin.script:

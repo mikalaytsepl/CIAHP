@@ -1,0 +1,27 @@
+---
+- name: Bootstrap the Ansible service account
+  hosts: myservers
+  become: yes
+
+  tasks:
+    - name: Create the 'ansible' user
+      user:
+        name: ansible
+        state: present
+        groups: sudo
+        append: yes
+        create_home: yes
+        shell: /bin/bash
+
+    - name: Allow 'ansible' user to have passwordless sudo
+      copy:
+        dest: /etc/sudoers.d/ansible
+        content: "ansible ALL=(ALL) NOPASSWD: ALL"
+        mode: '0440'
+        validate: /usr/sbin/visudo -cf %s
+
+    - name: Set up authorized keys for the 'ansible' user
+      authorized_key:
+        user: ansible
+        state: present
+        key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
