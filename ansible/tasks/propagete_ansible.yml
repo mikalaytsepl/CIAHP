@@ -1,11 +1,12 @@
 ---
 - name: Bootstrap the Ansible service account
-  hosts: myservers
+  hosts: "{{ target_node | default('all') }}" # target_user is provided by -e option, default is all - optimal only for tests
   become: yes
+  remote_user: "{{ initial_user | default('root') }}" # initial_user is provided by -e option, default is root
 
   tasks:
     - name: Create the 'ansible' user
-      user:
+      ansible.builtin.user:
         name: ansible
         state: present
         groups: sudo
@@ -14,14 +15,14 @@
         shell: /bin/bash
 
     - name: Allow 'ansible' user to have passwordless sudo
-      copy:
+      ansible.builtin.copy:
         dest: /etc/sudoers.d/ansible
         content: "ansible ALL=(ALL) NOPASSWD: ALL"
         mode: '0440'
         validate: /usr/sbin/visudo -cf %s
 
     - name: Set up authorized keys for the 'ansible' user
-      authorized_key:
+      ansible.posix.authorized_key:
         user: ansible
         state: present
         key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
