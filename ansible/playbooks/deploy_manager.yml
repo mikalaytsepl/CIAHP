@@ -1,0 +1,11 @@
+---
+- name: Deploy Manager Node
+  hosts: global_managers
+  become: true
+
+  tasks:
+    - name: Run General Setup Phase
+      ansible.builtin.import_tasks: ../tasks/general_setup.yml
+
+    - name: Run Manager Initialization Phase
+      ansible.builtin.import_tasks: ../tasks/init_manager.yml
