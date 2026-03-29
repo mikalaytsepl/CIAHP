@@ -1,0 +1,6 @@
+---
+- name: Execute create_worker.sh (Passing IP and Token as arguments)
+  ansible.builtin.script: >
+    ../../scripts/setup_scripts/create_worker.sh 
+    "{{ hostvars[groups['global_managers'][0]]['ansible_host'] }}" 
+    "{{ hostvars[groups['global_managers'][0]]['worker_join_command'] }}"

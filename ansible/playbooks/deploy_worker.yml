@@ -1,5 +1,4 @@
 ---
-
 - name: Retrieve join command from manager
   hosts: global_managers
   become: true
@@ -17,11 +16,7 @@
   become: true
   tasks:
     - name: Run General Setup Phase
-      ansible.builtin.script: ../../scripts/setup_scripts/general_setup.sh
+      ansible.builtin.import_tasks: ../tasks/general_setup.yml
 
-    - name: Run Worker Join Phase (Passing the token as an argument)
-      # Pass the variable dynamically into the bash script execution
-      ansible.builtin.script: >
-          ../../scripts/setup_scripts/create_worker.sh 
-          "{{ hostvars[groups['global_managers'][0]]['ansible_host'] }}" 
-          "{{ hostvars[groups['global_managers'][0]]['worker_join_command'] }}"
+    - name: Run Worker Join Phase
+      ansible.builtin.import_tasks: ../tasks/join_worker.yml
