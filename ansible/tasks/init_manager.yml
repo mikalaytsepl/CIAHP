@@ -1,0 +1,3 @@
+---
+- name: Execute create_manager.sh
+  ansible.builtin.script: ../../scripts/setup_scripts/create_manager.sh

@@ -13,8 +13,8 @@ all:
                         my-cluster_managers:
                             hosts:
                                 new-manager:
-                                    ansible_host: 172.16.86.130
+                                    ansible_host: 192.168.20.248
                         my-cluster_workers:
                             hosts:
                                 new-worker:
-                                    ansible_host: 172.16.86.131
+                                    ansible_host: 192.168.20.242

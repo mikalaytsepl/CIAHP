@@ -1,0 +1,22 @@
+---
+- name: Retrieve join command from manager
+  hosts: global_managers
+  become: true
+  tasks:
+    - name: Get token
+      ansible.builtin.command: kubeadm token create --print-join-command
+      register: join_command_raw
+
+    - name: Save to memory
+      ansible.builtin.set_fact:
+        worker_join_command: "{{ join_command_raw.stdout }}"
+
+- name: Deploy Worker Node
+  hosts: global_workers
+  become: true
+  tasks:
+    - name: Run General Setup Phase
+      ansible.builtin.import_tasks: ../tasks/general_setup.yml
+
+    - name: Run Worker Join Phase
+      ansible.builtin.import_tasks: ../tasks/join_worker.yml
