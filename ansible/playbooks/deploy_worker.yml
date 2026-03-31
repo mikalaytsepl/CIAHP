@@ -1,6 +1,6 @@
 ---
 - name: Retrieve join command from manager
-  hosts: global_managers
+  hosts: "{{ target_cluster }}_managers"
   become: true
   tasks:
     - name: Get token
@@ -12,7 +12,7 @@
         worker_join_command: "{{ join_command_raw.stdout }}"
 
 - name: Deploy Worker Node
-  hosts: global_workers
+  hosts: "{{ target_cluster }}_workers"
   become: true
   tasks:
     - name: Run General Setup Phase

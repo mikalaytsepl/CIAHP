@@ -150,9 +150,9 @@ class InventoryManager():
     
 
 if __name__ == '__main__':
+    # Utworzenie pustego inventory
     inventory = InventoryManager('/home/miko/CIAHP/ansible/inventory.yml')
 
-    inventory.truncate_cluster_resources("my-cluster")
-
-    inventory.add_host("new-worker","172.16.86.131","my-cluster","workers")
-    inventory.add_host("new-manager","172.16.86.130","my-cluster","managers")
+    # jeżeli tego klastra jeszcze nie ma to zostanie dodany
+    inventory.add_host("presentation-worker","172.16.86.130","presentation_cluster","workers")
+    inventory.add_host("presentation-manager","172.16.86.131","presentation_cluster","managers")

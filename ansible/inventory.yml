@@ -2,19 +2,19 @@ all:
     children:
         global_managers:
             children:
-                my-cluster_managers: {}
+                presentation_cluster_managers: {}
         global_workers:
             children:
-                my-cluster_workers: {}
+                presentation_cluster_workers: {}
         clusters:
             children:
-                my-cluster:
+                presentation_cluster:
                     children:
-                        my-cluster_managers:
+                        presentation_cluster_workers:
                             hosts:
-                                new-manager:
-                                    ansible_host: 192.168.20.248
-                        my-cluster_workers:
+                                presentation-worker:
+                                    ansible_host: 172.16.86.130
+                        presentation_cluster_managers:
                             hosts:
-                                new-worker:
-                                    ansible_host: 192.168.20.242
+                                presentation-manager:
+                                    ansible_host: 172.16.86.131

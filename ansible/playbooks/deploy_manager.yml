@@ -1,6 +1,6 @@
 ---
 - name: Deploy Manager Node
-  hosts: global_managers
+  hosts: "{{ target_cluster_managers }}_managers" 
   become: true
 
   tasks:
