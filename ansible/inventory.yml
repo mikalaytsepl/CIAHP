@@ -2,19 +2,14 @@ all:
     children:
         global_managers:
             children:
-                presentation_cluster_managers: {}
+                general_setup_test_managers: {}
         global_workers:
-            children:
-                presentation_cluster_workers: {}
+            children: {}
         clusters:
             children:
-                presentation_cluster:
+                general_setup_test:
                     children:
-                        presentation_cluster_workers:
-                            hosts:
-                                presentation-worker:
-                                    ansible_host: 172.16.86.130
-                        presentation_cluster_managers:
+                        general_setup_test_managers:
                             hosts:
                                 presentation-manager:
                                     ansible_host: 172.16.86.131

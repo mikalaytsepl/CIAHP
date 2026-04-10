@@ -38,7 +38,7 @@ sysctl --system
 apt update
 apt install -y curl gnupg2 software-properties-common apt-transport-https ca-certificates
 
-# install and onfigure containerd
+# install and configure containerd
 apt install -y containerd
 
 mkdir -p /etc/containerd

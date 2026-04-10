@@ -1,11 +1,15 @@
 ---
 - name: Deploy Manager Node
-  hosts: "{{ target_cluster_managers }}_managers" 
+  hosts: "{{ target_cluster }}_managers" 
   become: true
+
+  vars:
+    KUBE_VERSION: "{{ kube_version | default('1.35') }} "
 
   tasks:
     - name: Run General Setup Phase
       ansible.builtin.import_tasks: ../tasks/general_setup.yml
+
 
     - name: Run Manager Initialization Phase
       ansible.builtin.import_tasks: ../tasks/init_manager.yml

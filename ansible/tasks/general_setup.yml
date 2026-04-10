@@ -1,3 +1,146 @@
-- name: Execute general_setup.sh
-  # The script module transfers the local script to the remote node and runs it
-  ansible.builtin.script: ../../scripts/setup_scripts/general_setup.sh
+---
+- name: Starting general setup for the nodes
+  ansible.builtin.debug:
+    msg: "Using version {{ KUBE_VERSION }}"
+
+- name: Disabling swap
+  ansible.builtin.command: swapoff -a 
+  when: ansible_swaptotal_mb > 0
+  changed_when: false
+
+- name: Removing swap entries from fstab
+  ansible.builtin.mount:
+    name: none
+    fstype: swap
+    state: absent
+
+- name: Ensure modules directory exists
+  ansible.builtin.file:
+    path: /etc/modules-load.d
+    state: directory
+    mode: '0755'
+
+- name: Create containerd modules config
+  ansible.builtin.copy: 
+    dest: /etc/modules-load.d/containerd.conf
+    content: |
+      overlay
+      br_netfilter
+
+- name: Load overlay module
+  ansible.builtin.command: modprobe overlay
+  changed_when: false
+
+- name: Load br_netfilter module
+  ansible.builtin.command: modprobe br_netfilter
+  changed_when: false
+
+- name: Modifying kubernetes sysctl config
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/kubernetes.conf
+    content: |
+      net.bridge.bridge-nf-call-ip6tables = 1
+      net.bridge.bridge-nf-call-iptables = 1
+      net.ipv4.ip_forward = 1
+    mode: "0644"
+
+- name: Apply sysctl settings
+  ansible.builtin.command: sysctl --system
+  changed_when: false
+
+- name: Installing support packages
+  ansible.builtin.apt:
+    update_cache: yes
+    pkg:
+      - curl
+      - gnupg2
+      - software-properties-common
+      - apt-transport-https
+      - ca-certificates
+    state: present
+
+- name: Install containerd
+  ansible.builtin.apt:
+    name: containerd
+    state: present
+
+- name: Ensure /etc/containerd directory exists
+  ansible.builtin.file:
+    path: /etc/containerd
+    state: directory
+    mode: '0755'
+
+- name: Generate default containerd config
+  ansible.builtin.command: containerd config default
+  register: containerd_config
+  changed_when: false
+
+- name: Write containerd config to file
+  ansible.builtin.copy:
+    content: "{{ containerd_config.stdout }}"
+    dest: /etc/containerd/config.toml
+    force: no 
+
+- name: Enable SystemdCgroup in containerd config
+  ansible.builtin.replace:
+    path: /etc/containerd/config.toml
+    regexp: 'SystemdCgroup = false'
+    replace: 'SystemdCgroup = true'
+
+- name: Enable CRI plugin in containerd config
+  ansible.builtin.replace:
+    path: /etc/containerd/config.toml
+    regexp: 'disabled_plugins = \["cri"\]'
+    replace: 'disabled_plugins = []'
+
+- name: Restart and enable containerd
+  ansible.builtin.systemd:
+    name: containerd
+    state: restarted
+    enabled: yes
+    daemon_reload: yes
+
+- name: Create keyrings directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Download kubernetes GPG key
+  ansible.builtin.get_url:
+    url: "https://pkgs.k8s.io/core:/stable:/v{{ KUBE_VERSION.strip() }}/deb/Release.key"
+    dest: /etc/apt/keyrings/kubernetes-apt-keyring.asc
+    mode: '0644'
+
+- name: Add kube apt repo
+  ansible.builtin.apt_repository:
+    filename: kubernetes
+    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.asc] https://pkgs.k8s.io/core:/stable:/v{{ KUBE_VERSION.strip() }}/deb/ /"
+    state: present
+
+- name: Kube installation
+  ansible.builtin.apt:
+    update_cache: yes
+    pkg:
+      - kubelet
+      - kubeadm
+      - kubectl
+    state: present
+
+- name: Hold kubernetes packages
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - kubelet
+    - kubeadm
+    - kubectl
+
+- name: Enabling kubelet
+  ansible.builtin.systemd:
+    name: kubelet
+    enabled: yes
+
+- name: Final notification
+  ansible.builtin.debug:
+    msg: "Initial setup of the node has been completed."
