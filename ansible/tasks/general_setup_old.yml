@@ -1,3 +1,0 @@
-- name: Execute general_setup.sh
-  # The script module transfers the local script to the remote node and runs it
-  ansible.builtin.script: ../../scripts/setup_scripts/general_setup.sh
