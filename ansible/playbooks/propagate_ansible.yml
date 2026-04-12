@@ -1,6 +1,7 @@
 ---
 - name: Bootstrap the Ansible service account
-  hosts: "{{ target_node | default('all') }}" # target_user is provided by -e option, default is all - optimal only for tests
+  hosts: "{{ target_node | default(target_cluster | default('all')) }}"
+  # target_user or target_cluster is provided by -e option, default is all hosts in inventory file
   become: true
   remote_user: "{{ initial_user | default('root') }}" # initial_user is provided by -e option, default is root
 
