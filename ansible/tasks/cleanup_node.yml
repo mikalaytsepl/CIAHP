@@ -1,9 +1,13 @@
 ---
+- name: Heal interrupted package manager state
+  ansible.builtin.command: dpkg --configure -a
+  become: true
+  ignore_errors: true
+
 - name: Reset k8s cluster state
   ansible.builtin.command: "kubeadm reset -f"
   register: kubeadm_reset
-  failed_when: kubeadm_reset.rc != 0 and 'command not found' not in kubeadm_reset.stderr  
-  # Handle edge case: kubeadm command has already been deleted
+  ignore_errors: true
 
 - name: Stop and disable containerd
   ansible.builtin.systemd:
@@ -20,6 +24,11 @@
     - kubelet
     - kubeadm
     - kubectl
+  register: dpkg_unhold
+  until: dpkg_unhold is success
+  retries: 3 
+  delay: 10
+  ignore_errors: true
 
 - name: Remove Kubernetes and container packages
   ansible.builtin.apt:
@@ -32,6 +41,7 @@
     state: absent
     autoremove: yes
     purge: yes
+    lock_timeout: 120
 
 - name: Remove Kubernetes apt repository
   ansible.builtin.apt_repository:
