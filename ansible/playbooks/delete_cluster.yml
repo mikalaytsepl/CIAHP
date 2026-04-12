@@ -1,0 +1,16 @@
+---
+- name: Destroy all Worker Nodes
+  hosts: "{{ target_cluster }}_workers"
+  become: true
+
+  tasks:
+    - name: Wipe worker node
+      ansible.builtin.import_tasks: ../tasks/cleanup_node.yml
+
+- name: Destroy all Manager Nodes
+  hosts: "{{ target_cluster }}_managers"
+  become: true
+
+  tasks:
+    - name: Wipe manager node
+      ansible.builtin.import_tasks: ../tasks/cleanup_node.yml
