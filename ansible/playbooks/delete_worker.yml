@@ -1,3 +1,6 @@
+# README: This yml is designed to delete specific node from cluster
+# Worker deletion is tested; 
+# Manager deletion is ig. possible but not tested bc project has no way to deploy additional manager in cluster;
 ---
 - name: Remove node from cluster
   hosts: "{{ target_cluster }}_managers[0]"  # Target the first manager in inventory

@@ -1,3 +1,5 @@
+# README: This yml is designed to delete whole cluster including all workers and managers
+# Unlike delete_worker.yml this yml "doesn't care about" application downtime and just wipes all the nodes
 ---
 - name: Destroy all Worker Nodes
   hosts: "{{ target_cluster }}_workers"
