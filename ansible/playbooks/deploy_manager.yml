@@ -5,6 +5,7 @@
 
   vars:
     KUBE_VERSION: "{{ kube_version | default('1.35') }} "
+    CLUSTER_CIDR: "{{ cluster_cidr }}"
 
   tasks:
     - name: Run General Setup Phase

@@ -117,10 +117,11 @@
     filename: kubernetes
     repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.asc] https://pkgs.k8s.io/core:/stable:/v{{ KUBE_VERSION.strip() }}/deb/ /"
     state: present
+    update_cache: yes
 
 - name: Kube installation
   ansible.builtin.apt:
-    update_cache: yes
+    update_cache: no # since updated earlier after adding the repo
     pkg:
       - kubelet
       - kubeadm
@@ -140,6 +141,12 @@
   ansible.builtin.systemd:
     name: kubelet
     enabled: yes
+
+# installing python library to handle kubernetes stuff later on
+- name: Install kubernetes python library
+  ansible.builtin.apt:
+    name: python3-kubernetes
+    state: present
 
 - name: Final notification
   ansible.builtin.debug:

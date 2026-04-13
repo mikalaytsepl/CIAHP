@@ -154,4 +154,4 @@ if __name__ == '__main__':
     inventory = InventoryManager('/home/miko/CIAHP/ansible/inventory.yml')
 
     # jeżeli tego klastra jeszcze nie ma to zostanie dodany
-    inventory.add_host("presentation-manager","172.16.86.131","general_setup_test","managers")
+    inventory.add_host("presentation-manager","172.16.86.130","general_setup_test","managers")
