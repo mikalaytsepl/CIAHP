@@ -16,20 +16,6 @@
     enabled: false
   ignore_errors: true
 
-- name: Unhold Kubernetes packages
-  ansible.builtin.dpkg_selections:
-    name: "{{ item }}"
-    selection: install
-  loop:
-    - kubelet
-    - kubeadm
-    - kubectl
-  register: dpkg_unhold
-  until: dpkg_unhold is success
-  retries: 3 
-  delay: 10
-  ignore_errors: true
-
 - name: Remove Kubernetes and container packages
   ansible.builtin.apt:
     name:
@@ -42,6 +28,7 @@
     autoremove: yes
     purge: yes
     lock_timeout: 120
+    allow_change_held_packages: true
 
 - name: Remove Kubernetes apt repository
   ansible.builtin.apt_repository:
@@ -62,6 +49,18 @@
     - /etc/apt/keyrings/kubernetes-apt-keyring.gpg
     - /root/.kube
     - /home/ansible/.kube
+
+# If node has to be th  part of NEW cluster this step is crucial
+- name: Clean up lingering CNI network interfaces
+  ansible.builtin.shell: |
+    ip link delete cni0 || true
+    ip link delete flannel.1 || true
+    ip link delete kube-ipvs0 || true
+    ip link delete nodelocaldns || true
+    ip link delete vxlan.calico || true
+    ip link delete tunl0 || true
+  ignore_errors: true
+  changed_when: false
 
 - name: Reload systemd daemon
   ansible.builtin.systemd:
