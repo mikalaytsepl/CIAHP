@@ -4,7 +4,12 @@ from pathlib import Path
 from enum import Enum
 from typing import Literal
 
+import string
+from random import choices
+
 import yaml
+
+import re
 
 class HostType(str,Enum):
     MANAGER="manager"
@@ -93,6 +98,12 @@ class InventoryManager():
 
             # Add the actual host data
             host_list = cluster_root["children"][role_group_name]["hosts"]
+            
+            # generate random suffix to ensure quniqueness
+            suffix = ''.join(choices(string.ascii_lowercase + string.digits, k=5))
+            full_name = f'{name}-{suffix}'
+            # sanitize name so k8s will accept it as a hostname
+            name = re.sub(r'[^a-z0-9-]', '-', full_name.lower())
             if name in host_list:
                 print(f"Warning: Host {name} already exists in {role_group_name}. Updating IP.")
             
@@ -154,4 +165,7 @@ if __name__ == '__main__':
     inventory = InventoryManager('/home/miko/CIAHP/ansible/inventory.yml')
 
     # jeżeli tego klastra jeszcze nie ma to zostanie dodany
-    inventory.add_host("presentation-manager","172.16.86.130","general_setup_test","managers")
+    inventory.add_host("first_manager","172.16.86.132","big_test_cluster","managers")
+    
+    inventory.add_host("first_worker","172.16.86.133","big_test_cluster","workers")
+    inventory.add_host("second_worker","172.16.86.134","big_test_cluster","workers")

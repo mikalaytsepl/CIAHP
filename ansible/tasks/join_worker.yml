@@ -1,6 +1,74 @@
 ---
-- name: Execute create_worker.sh (Passing IP and Token as arguments)
-  ansible.builtin.script: >
-    ../../scripts/setup_scripts/create_worker.sh 
-    "{{ hostvars[groups['global_managers'][0]]['ansible_host'] }}" 
-    "{{ hostvars[groups['global_managers'][0]]['worker_join_command'] }}"
+- name: Check if kubelet config exists
+  ansible.builtin.stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: kubelet_config
+
+- name: Fail if the node is already occupied
+  ansible.builtin.fail:
+    msg: "FATAL: This node is already part of a cluster (/etc/kubernetes/kubelet.conf exists). Manual cleanup required!"
+  when: kubelet_config.stat.exists
+
+- name: Check if kubelet binary exists
+  ansible.builtin.stat:
+    path: /usr/bin/kubelet
+  register: kubelet_check
+
+- name: Fail if kubelet missing
+  ansible.builtin.fail:
+    msg: "FATAL: Kubelet binary not found! Was initial setup executed?"
+  when: not kubelet_check.stat.exists
+
+# this is in case kubelet is elsewhere -- this part is location agnostic
+# - name: Check for kubelet using command -v
+#   ansible.builtin.command: command -v kubelet
+#   register: command_exists
+#   ignore_errors: true
+#   changed_when: false
+
+# - name: Searching for kubelet
+#   ansible.builtin.fail:
+#     msg: "FATAL: Kubelet binary not found! Was initial setup executed?"
+#   when: command_exists.rc != 0
+
+- name: Gathering facts 
+  ansible.builtin.service_facts:
+
+- name: Kubelet service status verification
+  ansible.builtin.assert:
+    that:
+    - ansible_facts.services['kubelet.service'].status == 'enabled'
+    fail_msg: "Kubelet service not enabled. Check setup logs!"
+    success_msg: "Kubelet service is running."
+
+- name: Manager reachability check
+  ansible.builtin.command: "ping -q -c 5 -w 10 {{ MANAGER_NODE_IP }}"
+  register: manager_reachable 
+  ignore_errors: true
+  changed_when: false
+
+- name: Fail if manager unreachable
+  ansible.builtin.fail:
+    msg: "FATAL: manager ({{ MANAGER_NODE_IP }}) is unreachable, cluster can not be joined"
+  when: manager_reachable.rc != 0
+
+- name: "Executing join to cluster: {{ TARGET_CLUSTER }}"
+  ansible.builtin.command: "{{ JOIN_COMMAND }}"
+
+# couldn't get this thing to work 
+# - name: Re-labeling node as worker 
+#   kubernetes.core.k8s_node:
+#       name: "{{ inventory_hostname }}"
+#       labels:
+#         node-role.kubernetes.io/worker: "worker"
+#       kubeconfig: /etc/kubernetes/admin.conf
+#   delegate_to: "{{ groups[TARGET_CLUSTER + '_managers'][0] }}"
+#   become: true
+
+- name: Re-labeling node as worker
+  ansible.builtin.shell: |
+    kubectl label node {{ inventory_hostname }} node-role.kubernetes.io/worker=worker --overwrite
+  delegate_to: "{{ MANAGER_NODE }}"
+  become: true
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
