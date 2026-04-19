@@ -1,0 +1,68 @@
+---
+- name: Heal interrupted package manager state
+  ansible.builtin.command: dpkg --configure -a
+  become: true
+  ignore_errors: true
+
+- name: Reset k8s cluster state
+  ansible.builtin.command: "kubeadm reset -f"
+  register: kubeadm_reset
+  ignore_errors: true
+
+- name: Stop and disable containerd
+  ansible.builtin.systemd:
+    name: containerd
+    state: stopped
+    enabled: false
+  ignore_errors: true
+
+- name: Unhold Kubernetes packages
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: install
+  loop:
+    - kubelet
+    - kubeadm
+    - kubectl
+  register: dpkg_unhold
+  until: dpkg_unhold is success
+  retries: 3 
+  delay: 10
+  ignore_errors: true
+
+- name: Remove Kubernetes and container packages
+  ansible.builtin.apt:
+    name:
+      - kubelet
+      - kubeadm
+      - kubectl
+      - kubernetes-cni
+      - containerd
+    state: absent
+    autoremove: yes
+    purge: yes
+    lock_timeout: 120
+
+- name: Remove Kubernetes apt repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version | default('1.35') }}/deb/ /"
+    state: absent
+
+- name: Remove configuration directories and files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/kubernetes
+    - /var/lib/etcd
+    - /var/lib/kubelet
+    - /etc/cni
+    - /opt/cni
+    - /etc/containerd
+    - /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+    - /root/.kube
+    - /home/ansible/.kube
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: yes

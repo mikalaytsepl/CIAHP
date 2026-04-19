@@ -1,0 +1,28 @@
+# README: This yml is designed to delete specific node from cluster
+# Worker deletion is tested; 
+# Manager deletion is ig. possible but not tested bc project has no way to deploy additional manager in cluster;
+---
+- name: Remove node from cluster
+  hosts: "{{ target_cluster }}_managers[0]"  # Target the first manager in inventory
+  become: true
+
+  tasks:
+    - name: Drain the node # To ensure minimal downtime for application in cluster
+      ansible.builtin.command: "kubectl drain {{ target_node }} --ignore-daemonsets --delete-emptydir-data --force"
+      environment: 
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      ignore_errors: true
+
+    - name: Delete the node from cluster
+      ansible.builtin.command: "kubectl delete node {{ target_node }}"
+      environment: 
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      ignore_errors: true
+
+- name: Wipe the target node
+  hosts: "{{ target_node }}"
+  become: true
+
+  tasks:
+  - name: Use ../tasks/cleanup_node.yml to wipe the node
+    ansible.builtin.import_tasks: ../tasks/cleanup_node.yml

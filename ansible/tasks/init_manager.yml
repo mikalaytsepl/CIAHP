@@ -1,3 +1,93 @@
 ---
-- name: Execute create_manager.sh
-  ansible.builtin.script: ../../scripts/setup_scripts/create_manager.sh
+    # --- Verify Pre-requisites Block ---
+    - name: Verify Pre-requisites
+      block:
+        - name: Check if kubelet binary exists
+          ansible.builtin.stat:
+            path: /usr/bin/kubelet
+          register: kubelet_bin
+
+        # write stat output into variable and evaluate it in the next task
+        # playbook will fail if kubelet is not present
+        - name: Fail if kubelet is missing
+          ansible.builtin.fail:
+            msg: "Kubelet binary not found! Are you sure initial setup was executed?"
+          when: not kubelet_bin.stat.exists
+
+        # gather services facts about the node
+        - name: Gathering facts 
+          ansible.builtin.service_facts:
+
+        - name: Kubelet service status verification
+          ansible.builtin.assert:
+            that:
+              - ansible_facts.services['kubelet.service'].status == 'enabled'
+            fail_msg: "Kubelet service is not enabled or failed, check setup."
+            success_msg: "Kubelet service is running, cluster can be initialized."
+    
+    # --- Cluster Config Check Block ---
+    - name: Cluster config file check
+      block:
+        - name: Check for admin.conf
+          ansible.builtin.stat: 
+            path: /etc/kubernetes/admin.conf
+          register: kube_check
+          
+        - name: Assert cluster is not initialized
+          ansible.builtin.assert:
+            that: 
+              - not kube_check.stat.exists
+            success_msg: "Cluster has not been initialized, clear to init."
+            fail_msg: "Cluster is already created, aborting."
+
+    # --- Initialization Section ---
+    - name: Announce Initialization
+      ansible.builtin.debug:
+        msg: "Initializing the cluster with CID: {{ cluster_cidr }}"
+
+    - name: Initializing the cluster 
+      ansible.builtin.command: "kubeadm init --pod-network-cidr={{ cluster_cidr }}"
+
+    # ownership delegation has been cut out, we don't need it anymore
+
+    - name: Installing CNI (calico)
+      kubernetes.core.k8s:
+        src: https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/calico.yaml
+        state: present
+        kubeconfig: /etc/kubernetes/admin.conf
+
+    # --- Wait for Components Block ---
+    - name: Wait for Cluster Components
+      vars:
+        # just a var for config
+        kubeconfig: "/etc/kubernetes/admin.conf"
+      block:
+        - name: Wait for Etcd
+          ansible.builtin.command: >
+            kubectl wait --for=condition=Ready pod -l component=etcd 
+            -n kube-system --timeout=300s --kubeconfig {{ kubeconfig }}
+
+        - name: Wait for API Server
+          ansible.builtin.command: >
+            kubectl wait --for=condition=Ready pod -l component=kube-apiserver 
+            -n kube-system --timeout=300s --kubeconfig {{ kubeconfig }}
+
+        - name: Wait for Controller Manager
+          ansible.builtin.command: >
+            kubectl wait --for=condition=Ready pod -l component=kube-controller-manager 
+            -n kube-system --timeout=300s --kubeconfig {{ kubeconfig }}
+
+        - name: Wait for Scheduler
+          ansible.builtin.command: >
+            kubectl wait --for=condition=Ready pod -l component=kube-scheduler 
+            -n kube-system --timeout=300s --kubeconfig {{ kubeconfig }}
+
+        - name: Wait for Calico CNI
+          ansible.builtin.command: >
+            kubectl wait --for=condition=Ready pod -l k8s-app=calico-node 
+            -n kube-system --timeout=300s --kubeconfig {{ kubeconfig }}
+
+        - name: Wait for CoreDNS
+          ansible.builtin.command: >
+            kubectl wait --for=condition=Ready pod -l k8s-app=kube-dns 
+            -n kube-system --timeout=300s --kubeconfig {{ kubeconfig }}
