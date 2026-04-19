@@ -1,0 +1,40 @@
+---
+- name: Retrieve join credentials from the main manager
+  hosts: "{{ target_cluster }}_managers[0]"
+  become: true
+  tasks:
+    - name: Get standard join command
+      ansible.builtin.command: kubeadm token create --print-join-command
+      register: join_command_raw
+
+    - name: Upload certs and get key
+      ansible.builtin.shell: kubeadm init phase upload-certs --upload-certs | tail -n 1
+      register: cert_key_raw
+
+    - name: Save HA join command to memory
+      ansible.builtin.set_fact:
+        manager_join_command: "{{ join_command_raw.stdout }} --control-plane --certificate-key {{ cert_key_raw.stdout }}"
+
+- name: Deploy Additional Manager Nodes
+  # By default, targets all managers EXCEPT the first one, but specific host can be targeted
+  hosts: "{{ target_node | default(target_cluster + '_managers[1:]') }}" 
+  become: true
+  
+  vars:
+    KUBE_VERSION: "{{ kube_version | default('1.35') }}"
+
+  tasks:
+    - name: Run General Setup Phase
+      ansible.builtin.import_tasks: ../tasks/general_setup.yml
+
+    - name: Run High Availability Setup
+      ansible.builtin.import_tasks: ../tasks/setup_ha.yml
+
+    - name: Check if node is already joined
+      ansible.builtin.stat:
+        path: /etc/kubernetes/admin.conf
+      register: k8s_conf
+
+    - name: Join the HA Control Plane
+      ansible.builtin.command: "{{ hostvars[groups[target_cluster + '_managers'][0]]['manager_join_command'] }}"
+      when: not k8s_conf.stat.exists

@@ -1,0 +1,18 @@
+---
+- name: Deploy Bootstrap Manager Node (Creates Cluster)
+  hosts: "{{ target_cluster }}_managers[0]" 
+  become: true
+
+  vars:
+    KUBE_VERSION: "{{ kube_version | default('1.35') }}"
+    CLUSTER_CIDR: "{{ cluster_cidr }}"
+
+  tasks:
+    - name: Run General Setup Phase
+      ansible.builtin.import_tasks: ../tasks/general_setup.yml
+
+    - name: Run High Availability Setup
+      ansible.builtin.import_tasks: ../tasks/setup_ha.yml
+
+    - name: Run Manager Initialization Phase
+      ansible.builtin.import_tasks: ../tasks/init_manager.yml
