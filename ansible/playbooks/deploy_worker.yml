@@ -1,26 +1,40 @@
 ---
-- name: Retrieve join command from manager
-  hosts: "{{ target_cluster }}_managers"
+- name: Retrieve Information from Manager
+  # Use the first manager in the group
+  hosts: "{{ groups[target_cluster + '_managers'][0] }}"
   become: true
   tasks:
-    - name: Get token
+    - name: Get join command
       ansible.builtin.command: kubeadm token create --print-join-command
       register: join_command_raw
 
-    - name: Save to memory
+    - name: Get installed Kube version
+      # We use awk to grab just the version number (e.g., 1.35)
+      ansible.builtin.shell: kubeadm version -o short | cut -d'v' -f2
+      register: detected_version
+      changed_when: false
+
+    - name: Share facts with all hosts
       ansible.builtin.set_fact:
-        worker_join_command: "{{ join_command_raw.stdout }}"
+        shared_join_command: "{{ join_command_raw.stdout }}"
+        shared_kube_version: "{{ detected_version.stdout | trim }}"
+      # This makes the variables available to other plays in this run
+      run_once: true
 
 - name: Deploy Worker Node
   hosts: "{{ target_cluster }}_workers"
   become: true
-
   vars:
-      KUBE_VERSION: "{{ kube_version | default('1.35') }} "
-  
+    MANAGER_NODE: "{{ groups[target_cluster + '_managers'][0] }}"
+    MANAGER_NODE_IP: "{{ hostvars[MANAGER_NODE]['ansible_host'] }}"
+    KUBE_VERSION: "{{ hostvars[MANAGER_NODE]['shared_kube_version'] }}"
+    JOIN_COMMAND: "{{ hostvars[MANAGER_NODE]['shared_join_command'] }}"
+    TARGET_CLUSTER: "{{ target_cluster }}"
+
   tasks:
-    - name: Run General Setup Phase
+    - name: Run General Setup
       ansible.builtin.import_tasks: ../tasks/general_setup.yml
 
-    - name: Run Worker Join Phase
+    - name: Run Worker Join
       ansible.builtin.import_tasks: ../tasks/join_worker.yml
+

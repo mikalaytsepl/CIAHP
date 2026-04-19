@@ -3,6 +3,17 @@
   ansible.builtin.debug:
     msg: "Using version {{ KUBE_VERSION }}"
 
+- name: Set hostname to match inventory name
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname }}"
+
+- name: Update /etc/hosts to prevent sudo/hostname resolution delays
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1'
+    line: "127.0.1.1 {{ inventory_hostname }}"
+    state: present
+
 - name: Disabling swap
   ansible.builtin.command: swapoff -a 
   when: ansible_swaptotal_mb > 0
@@ -108,7 +119,8 @@
 
 - name: Download kubernetes GPG key
   ansible.builtin.get_url:
-    url: "https://pkgs.k8s.io/core:/stable:/v{{ KUBE_VERSION.strip() }}/deb/Release.key"
+  # check that thing again and establish what's wrong with versinos
+    url: "https://pkgs.k8s.io/core:/stable:/v{{ KUBE_VERSION.split('.')[:2] | join('.') }}/deb/Release.key"
     dest: /etc/apt/keyrings/kubernetes-apt-keyring.asc
     mode: '0644'
 
