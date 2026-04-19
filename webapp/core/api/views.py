@@ -13,3 +13,4 @@ def instances(request):
 
 def hardening(request):
 	return render(request, 'hardening.html')
+

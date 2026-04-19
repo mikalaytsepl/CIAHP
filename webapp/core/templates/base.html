@@ -1,11 +1,79 @@
+{% load static %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pl">
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Document</title>
+	<title>{% block title %}Panel{% endblock %} - CIAHP</title>
+
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="{% static 'css/main.css' %}">
+
+	{% block extra_styles %}{% endblock %}
 </head>
 <body>
-	Base html
+<!--Side Bar-->
+<aside class="sidebar">
+	<div class="sidebar-logo">
+		<div class="logo-name">CIAHP</div>
+		<div class="logo-sub">Witaj</div>
+	</div>
+
+	<nav class="sidebar-nav">
+		<a href="{% url 'dashboard' %}" class="nav-item {% block nav_dashboard %}{% endblock %}">
+			<svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
+				<path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM13 11a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1v-1a1 1 0 10-2 0v1h-1z"/>
+			</svg>
+			Dashboard
+		</a>
+
+		<a href="{% url 'instances' %}" class="nav-item {% block nav_instances %}{% endblock %}">
+			<svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
+				<path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"/>
+			</svg>
+			Zarządzanie Instancjami i Klastrem
+		</a>
+
+		<a href="{% url 'hardening' %}" class="nav-item {% block nav_hardening %}{% endblock %}">
+			<svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
+				<path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+			</svg>
+			Ustawienia Utwardzania
+		</a>
+	</nav>
+
+	<div class="sidebar-footer">
+		<a href="{% url 'docs' %}" class="nav-item {% block nav_docs %}{% endblock %}" target="_blank">
+			<svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
+				<path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"/>
+			</svg>
+			Dokumentacja
+		</a>
+	</div>
+</aside>
+
+<!--Main-->
+<main class="main">
+	<header class="topbar">
+		<div class="topbar-left">
+			{% block topbar_section %}{% endblock %}
+			{% if block.super %}
+				<span class="topbar-separator">/</span>
+			{% endif %}
+			{% block topbar_page %}{% endblock %}
+		</div>
+		<div class="topbar-right">
+			{% block topbar_right %}{% endblock %}
+		</div>
+	</header>
+
+	<div class="content">
+		{% block content %}{% endblock %}
+	</div>
+</main>
+
+{% block extra_scripts %}{% endblock %}
+
 </body>
 </html>
