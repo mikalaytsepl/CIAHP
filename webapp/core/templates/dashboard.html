@@ -1,11 +1,16 @@
 {% extends "base.html" %}
 
+{% block extra_styles %}
+{% endblock %}
+
 {% block title %}Dashboard{% endblock %}
 {% block nav_dashboard %}active{% endblock %}
  
-{% block topbar_section %}Overview{% endblock %}
-{% block topbar_page %}Dashboard{% endblock %}
+{% block topbar_section %}System status{% endblock %}
  
 {% block content %}
 {# Tu będzie zawartość dashboardu #}
+{% endblock %}
+
+{% block extra_scripts %}
 {% endblock %}
