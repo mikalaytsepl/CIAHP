@@ -157,15 +157,21 @@ class InventoryManager():
         for resoruce_group in cluster_resource_groups:
             cluster_resources[resoruce_group]['hosts'].clear()
         self._save(inv)
-
     
+    def set_cluster_ha_vars(self, cluster_name: str, vip_address: str, endpoint_port: int = 8443) -> None:
+        """Injects the HA VIP and Control Plane Endpoint vars into the specified cluster configuration"""
+        inv = self._load()
+
+        all_children = inv["all"]["children"]
+        cluster_root = all_children["clusters"]["children"].setdefault(cluster_name, {"children": {}})
+
+        cluster_vars = cluster_root.setdefault("vars", {})
+        cluster_vars["cluster_vip"] = vip_address
+        cluster_vars["control_plane_endpoint"] = f'{vip_address}:{endpoint_port}'
+
+        self._save(inv)
+        print(f"Successfully set HA variables for '{cluster_name}' (VIP: {vip_address}, Endpoint: {vip_address}:{endpoint_port})")
+
 
 if __name__ == '__main__':
-    # Utworzenie pustego inventory
-    inventory = InventoryManager('/home/miko/CIAHP/ansible/inventory.yml')
-
-    # jeżeli tego klastra jeszcze nie ma to zostanie dodany
-    inventory.add_host("first_manager","172.16.86.132","big_test_cluster","managers")
-    
-    inventory.add_host("first_worker","172.16.86.133","big_test_cluster","workers")
-    inventory.add_host("second_worker","172.16.86.134","big_test_cluster","workers")
+    ...
