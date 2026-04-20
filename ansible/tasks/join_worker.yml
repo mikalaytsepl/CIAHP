@@ -42,33 +42,23 @@
     success_msg: "Kubelet service is running."
 
 - name: Manager reachability check
-  ansible.builtin.command: "ping -q -c 5 -w 10 {{ MANAGER_NODE_IP }}"
-  register: manager_reachable 
+  ansible.builtin.command: "ping -q -c 5 -w 10 {{ VIP_ADDRESS }}"
+  register: vip_reachable 
   ignore_errors: true
   changed_when: false
 
-- name: Fail if manager unreachable
+- name: Fail if VIP is unreachable
   ansible.builtin.fail:
-    msg: "FATAL: manager ({{ MANAGER_NODE_IP }}) is unreachable, cluster can not be joined"
-  when: manager_reachable.rc != 0
+    msg: "FATAL: manager ({{ VIP_ADDRESS }}) is unreachable, cluster can not be joined"
+  when: vip_reachable.rc != 0
 
 - name: "Executing join to cluster: {{ TARGET_CLUSTER }}"
   ansible.builtin.command: "{{ JOIN_COMMAND }}"
 
-# couldn't get this thing to work 
-# - name: Re-labeling node as worker 
-#   kubernetes.core.k8s_node:
-#       name: "{{ inventory_hostname }}"
-#       labels:
-#         node-role.kubernetes.io/worker: "worker"
-#       kubeconfig: /etc/kubernetes/admin.conf
-#   delegate_to: "{{ groups[TARGET_CLUSTER + '_managers'][0] }}"
-#   become: true
-
 - name: Re-labeling node as worker
   ansible.builtin.shell: |
     kubectl label node {{ inventory_hostname }} node-role.kubernetes.io/worker=worker --overwrite
-  delegate_to: "{{ MANAGER_NODE }}"
+  delegate_to: "{{ ACTIVE_MANAGER }}"
   become: true
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf

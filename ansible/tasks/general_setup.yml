@@ -127,9 +127,9 @@
     mode: '0644'
 
 - name: Add kube apt repo
-  ansible.builtin.apt_repository:
-    filename: kubernetes
-    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.asc] https://pkgs.k8s.io/core:/stable:/v{{ KUBE_VERSION.strip() }}/deb/ /"
+  apt_repository:
+    # There is no k8s repo for minor versions like v1.35.5; all the info is on v1.35 repo
+    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.asc] https://pkgs.k8s.io/core:/stable:/v{{ KUBE_VERSION.split('.')[0:2] | join('.') }}/deb/ /"
     state: present
     update_cache: yes
 

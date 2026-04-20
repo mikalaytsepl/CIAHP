@@ -1,7 +1,15 @@
 ---
+- name: Find an active manager to retrieve credentials
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Select an active manager for execution
+      ansible.builtin.set_fact:
+        # Grabs the first available manager in the list
+        exec_manager: "{{ groups[target_cluster + '_managers'] | first }}"
+
 - name: Retrieve Information from Manager
-  # Use the first manager in the group
-  hosts: "{{ groups[target_cluster + '_managers'][0] }}"
+  hosts: "{{ hostvars['localhost']['exec_manager'] }}"
   become: true
   tasks:
     - name: Get join command
@@ -9,7 +17,6 @@
       register: join_command_raw
 
     - name: Get installed Kube version
-      # We use awk to grab just the version number (e.g., 1.35)
       ansible.builtin.shell: kubeadm version -o short | cut -d'v' -f2
       register: detected_version
       changed_when: false
@@ -18,18 +25,18 @@
       ansible.builtin.set_fact:
         shared_join_command: "{{ join_command_raw.stdout }}"
         shared_kube_version: "{{ detected_version.stdout | trim }}"
-      # This makes the variables available to other plays in this run
+        active_manager: "{{ inventory_hostname }}"
       run_once: true
 
 - name: Deploy Worker Node
-  hosts: "{{ target_cluster }}_workers"
+  hosts: "{{ target_node | default(target_cluster + '_workers')}}"
   become: true
   vars:
-    MANAGER_NODE: "{{ groups[target_cluster + '_managers'][0] }}"
-    MANAGER_NODE_IP: "{{ hostvars[MANAGER_NODE]['ansible_host'] }}"
-    KUBE_VERSION: "{{ hostvars[MANAGER_NODE]['shared_kube_version'] }}"
-    JOIN_COMMAND: "{{ hostvars[MANAGER_NODE]['shared_join_command'] }}"
+    KUBE_VERSION: "{{ hostvars[groups[target_cluster + '_managers'][0]]['shared_kube_version'] }}"
+    JOIN_COMMAND: "{{ hostvars[groups[target_cluster + '_managers'][0]]['shared_join_command'] }}"
+    ACTIVE_MANAGER: "{{ hostvars[groups[target_cluster + '_managers'][0]]['active_manager'] }}"
     TARGET_CLUSTER: "{{ target_cluster }}"
+    VIP_ADDRESS: "{{ cluster_vip }}"
 
   tasks:
     - name: Run General Setup
@@ -37,4 +44,3 @@
 
     - name: Run Worker Join
       ansible.builtin.import_tasks: ../tasks/join_worker.yml
-
