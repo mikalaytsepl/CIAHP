@@ -69,11 +69,13 @@
       - apt-transport-https
       - ca-certificates
     state: present
+    lock_timeout: 300
 
 - name: Install containerd
   ansible.builtin.apt:
     name: containerd
     state: present
+    lock_timeout: 300
 
 - name: Ensure /etc/containerd directory exists
   ansible.builtin.file:
@@ -139,6 +141,7 @@
       - kubeadm
       - kubectl
     state: present
+    lock_timeout: 300
 
 - name: Hold kubernetes packages
   ansible.builtin.dpkg_selections:
@@ -159,6 +162,7 @@
   ansible.builtin.apt:
     name: python3-kubernetes
     state: present
+    lock_timeout: 300
 
 - name: Final notification
   ansible.builtin.debug:
