@@ -9,14 +9,18 @@
   register: kubeadm_reset
   ignore_errors: true
 
-- name: Stop and disable containerd
+- name: Stop and disable container and HA services
   ansible.builtin.systemd:
-    name: containerd
+    name: "{{ item }}"
     state: stopped
     enabled: false
+  loop:
+    - containerd
+    - haproxy
+    - keepalived
   ignore_errors: true
 
-- name: Remove Kubernetes and container packages
+- name: Remove Kubernetes, container, and HA packages
   ansible.builtin.apt:
     name:
       - kubelet
@@ -24,6 +28,8 @@
       - kubectl
       - kubernetes-cni
       - containerd
+      - haproxy
+      - keepalived
     state: absent
     autoremove: yes
     purge: yes
@@ -46,11 +52,12 @@
     - /etc/cni
     - /opt/cni
     - /etc/containerd
+    - /etc/haproxy
+    - /etc/keepalived
     - /etc/apt/keyrings/kubernetes-apt-keyring.gpg
     - /root/.kube
     - /home/ansible/.kube
 
-# If node has to be th  part of NEW cluster this step is crucial
 - name: Clean up lingering CNI network interfaces
   ansible.builtin.shell: |
     ip link delete cni0 || true
