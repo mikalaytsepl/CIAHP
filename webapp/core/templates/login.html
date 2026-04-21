@@ -1,11 +1,41 @@
+{% load static %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pl">
 <head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Document</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CIAHP — Logowanie</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/login.css' %}">
 </head>
 <body>
-	Ciemno wszędzie, głucho wszędzie, Co to będzie, co to będzie?
+
+  <div class="login-card">
+
+    <div class="login-brand">
+      <span class="login-brand__name">CIAHP</span>
+    </div>
+
+    <form class="login-form" method="post">
+      {% csrf_token %}
+      <div class="login-field">
+        <label class="login-label" for="username">Użytkownik</label>
+        <input class="login-input" type="text" id="username" name="username" placeholder="User Name" autocomplete="username">
+      </div>
+      <div class="login-field">
+        <label class="login-label" for="password">Hasło</label>
+        <input class="login-input" type="password" id="password" name="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button class="login-btn" type="submit">Zaloguj</button>
+    </form>
+
+    <a href="#" class="login-forgot">Zapomniałeś hasła?</a>
+
+  </div>
+
+  <footer class="login-footer">© TBD</footer>
+
 </body>
 </html>
