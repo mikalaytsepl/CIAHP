@@ -6,9 +6,9 @@
   padding: 0;
 }
 
-/* ── ZMIENNE ── */
+/* ── VARIABLES ── */
 :root {
-  /* Kolory z design system */
+  /* Design system colors */
   --primary:       #2EA043;
   --primary-dark:  #1a6b2a;
   --primary-dim:   rgba(46,160,67,0.12);
@@ -20,7 +20,7 @@
   --tertiary:      #D29922;
   --tertiary-dim:  rgba(210,153,34,0.12);
 
-  /* Neutralne */
+  /* Neutral */
   --bg:            #0D1117;
   --surface:       #161b22;
   --surface2:      #1c2128;
@@ -28,7 +28,7 @@
   --border:        rgba(255,255,255,0.07);
   --border-active: rgba(255,255,255,0.15);
 
-  /* Tekst */
+  /* Text */
   --text:          #e6edf3;
   --text-muted:    #7d8590;
   --text-subtle:   #484f58;
@@ -41,7 +41,7 @@
   --sidebar-w:     255px;
   --header-h:      52px;
 
-  /* Fonty */
+  /* Fonts */
   --font-headline: 'Space Grotesk', sans-serif;
   --font-body:     'Inter', sans-serif;
 }
@@ -216,7 +216,7 @@ body {
 }
 
 .topbar-logout:hover {
-  background: var(--red-dim); /* Delikatna czerwień przy hoverze dla akcji logout */
+  background: var(--red-dim); /* Subtle red on hover for logout action */
   color: var(--red);
 }
 

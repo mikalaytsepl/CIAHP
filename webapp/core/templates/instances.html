@@ -1,16 +1,289 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block extra_styles %}
+<link rel="stylesheet" href="{% static 'css/instances.css' %}?v={% now 'U' %}">
 {% endblock %}
 
 {% block title %}Instancje i Klastry{% endblock %}
 {% block nav_instances %}active{% endblock %}
- 
+
 {% block topbar_section %}Infrastruktura{% endblock %}
- 
+
 {% block content %}
-{# Tu będzie zawartość zarządzania instancjami #}
+
+<div class="instances-grid">
+
+  <!-- ── LEFT COLUMN: FORM ── -->
+  <div>
+    <div class="section-header">
+      <h1 class="section-title">Konfiguracja Nowej Instancji</h1>
+      <p class="section-sub">Zdefiniuj parametry nowej maszyny w klastrze.</p>
+    </div>
+
+    <div class="config-panel">
+      <form id="instance-form" method="post">
+        {% csrf_token %}
+
+        <!-- Name + IP -->
+        <div class="form-row">
+          <div class="form-field">
+            <label class="form-label" for="inst-name">Nazwa Instancji</label>
+            <input class="form-input" type="text" id="inst-name" name="name"
+                   placeholder="e.g. MONO-ST-01" required>
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="inst-ip">Adres IP</label>
+            <input class="form-input" type="text" id="inst-ip" name="ip"
+                   placeholder="0.0.0.0"
+                   pattern="^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
+                   autocomplete="off" required>
+            <span class="field-error" id="ip-error"></span>
+          </div>
+        </div>
+
+        <!-- Role -->
+        <div class="form-field">
+          <label class="form-label">Rola</label>
+          <div class="role-toggle">
+            <button type="button" class="role-btn active" data-role="manager">Manager</button>
+            <button type="button" class="role-btn" data-role="worker">Worker</button>
+          </div>
+          <input type="hidden" id="role-value" name="role" value="manager">
+        </div>
+
+        <!-- Cluster -->
+        <div class="form-field">
+          <label class="form-label" for="inst-cluster">Przypisanie do Klastra</label>
+          <select class="form-select" id="inst-cluster" name="cluster" required>
+            <option value="" disabled selected>Wybierz klaster…</option>
+            <option value="monolith">The Monolith Cluster (10.0.1.5)</option>
+            <option value="cluster-b">Cluster-B (10.0.2.1)</option>
+          </select>
+        </div>
+
+        <!-- Authentication method -->
+        <div class="form-field">
+          <label class="form-label">Metoda Uwierzytelniania</label>
+          <div class="auth-methods">
+            <div class="auth-card active" data-method="password">
+              <span class="auth-card__title">Login / Hasło</span>
+              <span class="auth-card__sub">Poświadczenia standardowe</span>
+            </div>
+            <div class="auth-card" data-method="key">
+              <span class="auth-card__title">Klucz Publiczny</span>
+              <span class="auth-card__sub">Klucz RSA / ED25519</span>
+            </div>
+          </div>
+          <input type="hidden" id="auth-method-value" name="auth_method" value="password">
+        </div>
+
+        <!-- Fields: Login / Password -->
+        <div class="auth-fields visible" id="auth-password">
+          <div class="form-row">
+            <div class="form-field" style="margin-bottom:0;">
+              <label class="form-label" for="inst-user">Użytkownik</label>
+              <input class="form-input" type="text" id="inst-user" name="username" placeholder="root">
+            </div>
+            <div class="form-field" style="margin-bottom:0;">
+              <label class="form-label" for="inst-pass">Hasło</label>
+              <input class="form-input" type="password" id="inst-pass" name="password" placeholder="••••••••">
+            </div>
+          </div>
+        </div>
+
+        <!-- Fields: Public key -->
+        <div class="auth-fields" id="auth-key">
+          <div class="form-field" style="margin-bottom:0;">
+            <label class="form-label" for="inst-pubkey">Klucz Publiczny</label>
+            <textarea class="form-input form-textarea" id="inst-pubkey" name="public_key"
+                      placeholder="ssh-rsa AAAA… lub ssh-ed25519 AAAA…"></textarea>
+          </div>
+        </div>
+
+        <button class="submit-btn" type="submit">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/>
+            <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/>
+            <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/>
+            <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>
+          </svg>
+          [ Wdróż Instancję ]
+        </button>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- ── RIGHT COLUMN: STRUCTURE VIEW ── -->
+  <div>
+    <div class="section-header">
+      <h1 class="section-title">Widok Struktury</h1>
+    </div>
+
+    <div class="structure-panel">
+      <div class="structure-panel__header">
+        <span class="structure-panel__title">Klastry</span>
+      </div>
+
+      <!-- Cluster 1 -->
+      <div class="cluster-item open">
+        <div class="cluster-row">
+          <svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+          <div class="cluster-info">
+            <div class="cluster-name">The Monolith Cluster</div>
+            <div class="cluster-meta">Global Production Zone · 2 Managers, 2 Workers</div>
+          </div>
+          <div class="cluster-actions">
+            <button class="btn-remove" type="button">Usuń</button>
+            <span class="status-badge" data-status="healthy">Healthy</span>
+          </div>
+        </div>
+
+        <div class="cluster-body">
+
+          <!-- Managers -->
+          <div class="sub-group open">
+            <div class="sub-group-row">
+              <svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+                   fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+              <span class="sub-group-label">Managers</span>
+              <span class="sub-group-count">2</span>
+            </div>
+            <div class="sub-group-body">
+
+              <div class="instance-item">
+                <div class="instance-info">
+                  <div class="instance-name">CLUSTER-ADM-01</div>
+                  <div class="instance-meta">10.0.1.5</div>
+                </div>
+                <div class="instance-actions">
+                  <span class="status-badge" data-status="healthy">Healthy</span>
+                  <button class="icon-btn" type="button" title="Usuń">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="3 6 5 6 21 6"/>
+                      <path d="M19 6l-1 14H6L5 6"/>
+                      <path d="M10 11v6M14 11v6"/>
+                      <path d="M9 6V4h6v2"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="instance-item">
+                <div class="instance-info">
+                  <div class="instance-name">CORE-ENGINE-01</div>
+                  <div class="instance-meta">192.168.1.10</div>
+                </div>
+                <div class="instance-actions">
+                  <span class="status-badge" data-status="error">Error</span>
+                  <button class="icon-btn" type="button" title="Usuń">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="3 6 5 6 21 6"/>
+                      <path d="M19 6l-1 14H6L5 6"/>
+                      <path d="M10 11v6M14 11v6"/>
+                      <path d="M9 6V4h6v2"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Workers -->
+          <div class="sub-group open">
+            <div class="sub-group-row">
+              <svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+                   fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+              <span class="sub-group-label">Workers</span>
+              <span class="sub-group-count">2</span>
+            </div>
+            <div class="sub-group-body">
+
+              <div class="instance-item">
+                <div class="instance-info">
+                  <div class="instance-name">WORKER-S-01</div>
+                  <div class="instance-meta">10.0.3.10</div>
+                </div>
+                <div class="instance-actions">
+                  <span class="status-badge" data-status="healthy">Healthy</span>
+                  <button class="icon-btn" type="button" title="Usuń">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="3 6 5 6 21 6"/>
+                      <path d="M19 6l-1 14H6L5 6"/>
+                      <path d="M10 11v6M14 11v6"/>
+                      <path d="M9 6V4h6v2"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="instance-item">
+                <div class="instance-info">
+                  <div class="instance-name">WORKER-S-02</div>
+                  <div class="instance-meta">10.0.3.11</div>
+                </div>
+                <div class="instance-actions">
+                  <span class="status-badge" data-status="deploying">Deploying</span>
+                  <button class="icon-btn" type="button" title="Usuń">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="3 6 5 6 21 6"/>
+                      <path d="M19 6l-1 14H6L5 6"/>
+                      <path d="M10 11v6M14 11v6"/>
+                      <path d="M9 6V4h6v2"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </div>
+      <!-- / Cluster 1 -->
+
+      <!-- Cluster 2 (placeholder) -->
+      <div class="cluster-item">
+        <div class="cluster-row">
+          <svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+          <div class="cluster-info">
+            <div class="cluster-name">Cluster-B</div>
+            <div class="cluster-meta">Staging Zone · 0 Managers, 0 Workers</div>
+          </div>
+          <div class="cluster-actions">
+            <button class="btn-remove" type="button">Usuń</button>
+            <span class="status-badge" data-status="deploying">Deploying</span>
+          </div>
+        </div>
+        <div class="cluster-body">
+          <!-- empty — no instances -->
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="{% static 'js/instances.js' %}"></script>
 {% endblock %}
