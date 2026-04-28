@@ -174,4 +174,5 @@ class InventoryManager():
 
 
 if __name__ == '__main__':
-    ...
+    test = InventoryManager('/home/miko/CIAHP/ansible/inventory.yml')
+    test.add_host("trivy_test","172.16.86.138","trivycls","managers")
