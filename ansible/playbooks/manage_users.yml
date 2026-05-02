@@ -1,0 +1,61 @@
+- name: Parse and Validate User Data
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    users_file: "../users-list.txt" 
+  
+  tasks:
+    - name: Check if the users text file exists
+      ansible.builtin.stat:
+        path: "{{ users_file }}"
+      register: txt_file
+
+    - name: Fail if users file is missing
+      ansible.builtin.fail:
+        msg: "The file '{{ users_file }}' does not exist. Check .example file and create your own"
+      when: not txt_file.stat.exists
+
+    - name: Read lines from file (ignoring blanks and comments)
+      ansible.builtin.set_fact:
+        raw_users: "{{ lookup('file', users_file).splitlines() | reject('match', '^#') | reject('match', '^\\s*$') | list }}"
+
+    - name: Check if public key files actually exist
+      ansible.builtin.stat:
+        path: "{{ item.split(',')[1] | trim }}"
+      loop: "{{ raw_users }}"
+      register: key_checks
+
+    - name: Fail if any public key is missing or invalid
+      ansible.builtin.fail:
+        msg: "Public key file missing for user '{{ item.item.split(',')[0] | trim }}' at path '{{ item.item.split(',')[1] | trim }}'"
+      when: not item.stat.exists
+      loop: "{{ key_checks.results }}"
+
+    - name: Build dynamic user list with actual key contents
+      ansible.builtin.set_fact:
+        parsed_human_users: >-
+          {{
+            parsed_human_users | default([]) + [{
+              'name': item.split(',')[0] | trim,
+              'key': lookup('file', item.split(',')[1] | trim),
+              'is_admin': (item.split(',')[2] | trim | lower) == 'true'
+            }]
+          }}
+      loop: "{{ raw_users }}"
+
+- name: Manage Human Access Users
+  hosts: "{{ target_node | default(target_cluster | default('all')) }}"
+  become: true
+  
+  vars:
+    human_users: "{{ hostvars['localhost']['parsed_human_users'] | default([]) }}"
+
+  tasks:
+    - name: Fail if no users were parsed
+      ansible.builtin.fail:
+        msg: "No valid users were found in the text file to apply or something wrong with previous play."
+      when: human_users | length == 0
+
+    - name: Execute User Management Tasks
+      ansible.builtin.import_tasks: ../tasks/manage_users.yml

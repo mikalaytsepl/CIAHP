@@ -1,0 +1,3 @@
+# Format: username, path_to_pub_key, is_admin (true/false)
+admin_tester, ~/.ssh/id_ed25519.pub, true
+readonly_tester, /tmp/tester_key.pub, false
