@@ -7,6 +7,7 @@
       - gnupg
       - lsb-release
     state: present
+    lock_timeout: 300
 
 - name: Add trivy GPG key
   ansible.builtin.get_url:
@@ -25,3 +26,4 @@
   ansible.builtin.apt:
     name: trivy
     state: present
+    lock_timeout: 300
