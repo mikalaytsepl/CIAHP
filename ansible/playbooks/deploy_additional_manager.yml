@@ -34,7 +34,9 @@
       ansible.builtin.stat:
         path: /etc/kubernetes/admin.conf
       register: k8s_conf
+      become: true
 
     - name: Join the HA Control Plane
       ansible.builtin.command: "{{ hostvars[groups[target_cluster + '_managers'][0]]['manager_join_command'] }}"
       when: not k8s_conf.stat.exists
+      become: true

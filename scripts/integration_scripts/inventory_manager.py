@@ -175,4 +175,9 @@ class InventoryManager():
 
 if __name__ == '__main__':
     test = InventoryManager('/home/miko/CIAHP/ansible/inventory.yml')
-    test.add_host("trivy_test","172.16.86.138","trivycls","managers")
+    test.add_host("main_manager","172.16.86.142","hardeningandha","managers")
+    test.add_host("second_manager","172.16.86.143","hardeningandha","managers")
+    test.set_cluster_ha_vars(
+        cluster_name= "hardeningandha",
+        vip_address="17.17.17.17"
+    )
