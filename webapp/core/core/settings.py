@@ -37,6 +37,11 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    # CIAHP apps
+    'api',
+    'clusters',
+    'operations',
+    'inventory',
 ]
 
 MIDDLEWARE = [
@@ -115,3 +120,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+# ── CIAHP paths ──────────────────────────────────────────────────────────────
+# BASE_DIR = webapp/core, so two levels up lands at the repo root
+ANSIBLE_DIR = BASE_DIR.parent.parent / 'ansible'
+INVENTORY_FILE = ANSIBLE_DIR / 'inventory.yml'
