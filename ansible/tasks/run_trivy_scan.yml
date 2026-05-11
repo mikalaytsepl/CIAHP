@@ -28,8 +28,8 @@
       --output /home/ansible/audit/trivy/{{ inventory_hostname }}_{{ starttimestamp.stdout }}.json
       --scanners vuln 
       --severity HIGH,CRITICAL 
-  async: 300
-  poll: 5
+  async: 300 # since task is running long, adding 300 second timeout 
+  poll: 5 # task is run in async mode and being checked on every 5 seconds so even if ssh blips we're good 
   changed_when: true
 
 - name: Get scan report back to controller

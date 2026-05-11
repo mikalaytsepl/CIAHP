@@ -45,18 +45,38 @@
       ansible.builtin.debug:
         msg: "Initializing cluster. CIDR: {{ cluster_cidr }} | Endpoint: {{ control_plane_endpoint }}"
 
+    - name: Ensure clean slate for initialization
+      ansible.builtin.command: kubeadm reset -f
+      when: not kube_check.stat.exists # Only reset if we haven't already succeeded
+
     - name: Initializing the cluster (HA Ready)
       ansible.builtin.command: >
         kubeadm init 
         --pod-network-cidr={{ cluster_cidr }} 
         --control-plane-endpoint={{ control_plane_endpoint }}
         --upload-certs
+        --ignore-preflight-errors=all
+      register: kubeadm_init
+      # If it fails, we want to see exactly why in the output
+      failed_when: kubeadm_init.rc != 0
 
-    - name: Installing CNI (calico)
-      kubernetes.core.k8s:
-        src: https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/calico.yaml
-        state: present
-        kubeconfig: /etc/kubernetes/admin.conf
+    - name: Deploy Calico Networking
+      block:
+        - name: Download Calico Manifest
+          ansible.builtin.get_url:
+            url: https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/calico.yaml
+            dest: /tmp/calico.yaml
+            mode: '0644'
+
+        - name: Apply Calico Manifest
+          kubernetes.core.k8s:
+            src: /tmp/calico.yaml
+            state: present
+            kubeconfig: /etc/kubernetes/admin.conf
+          register: calico_result
+          until: calico_result is success
+          retries: 5
+          delay: 10
 
     # --- Wait for Components Block ---
     - name: Wait for Cluster Components

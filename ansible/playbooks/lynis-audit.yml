@@ -1,0 +1,31 @@
+---
+- name: Lynis installation, audit and getting the report 
+  hosts: "{{ target_node }}"
+  become: true 
+
+
+  tasks:
+    - name: Install lynis (upate cache beforehand)
+      ansible.builtin.apt:
+        name: lynis
+        state: present 
+        update_cache: yes
+
+    - name: Get time and date for report 
+      ansible.builtin.command: date +%m-%d-%y-%H-%M
+      register: starttimestamp  
+      changed_when: false
+
+    - name: run lynis audit 
+      ansible.builtin.command: lynis audit system --quick
+      register: lynis_result
+      failed_when: false 
+      async: 300
+      poll: 5
+      changed_when: false
+
+    - name: fetch the report back to local machine
+      ansible.builtin.fetch:
+        src: /var/log/lynis-report.dat
+        dest: "./audit/lynis/{{ inventory_hostname }}_{{ starttimestamp.stdout }}.dat"
+        flat: yes
