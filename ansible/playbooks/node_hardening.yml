@@ -1,6 +1,6 @@
 ---
 - name: Secure K8S nodes
-  hosts: "{{ target_node }} | default({ target_cluster })"
+  hosts: "{{ target_node | default(target_cluster + '_managers:' + target_cluster + '_workers') }}"
   become: true
 
   tasks:

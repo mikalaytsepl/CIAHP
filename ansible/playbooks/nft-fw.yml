@@ -1,0 +1,60 @@
+---
+- name: Deploy Calico-Friendly nftables Hardening
+  hosts: "{{ target_node | default(target_cluster) }}"
+  become: true
+  gather_facts: true
+
+  vars:
+    # Captures the subnet of the node automatically (e.g., 172.16.86.0/24)
+    cluster_network: "{{ ansible_default_ipv4.network }}/24"
+
+  tasks:
+    - name: Ensure nftables is installed
+      ansible.builtin.package:
+        name: nftables
+        state: present
+
+    - name: Check if Kubelet is running (Cluster Verification)
+      ansible.builtin.command: systemctl is-active kubelet
+      register: kubelet_status
+      failed_when: false
+      changed_when: false
+
+    - name: Show Cluster Network found
+      ansible.builtin.debug:
+        msg: "Applying firewall rules for network: {{ cluster_network }}"
+
+    - name: Backup current nftables config with timestamp
+      ansible.builtin.copy:
+        src: /etc/nftables.conf
+        dest: "/etc/nftables.conf.{{ ansible_date_time.epoch }}.bak"
+        remote_src: true
+      ignore_errors: true
+
+    - name: Render new nftables config to temporary file
+      ansible.builtin.template:
+        src: policies/ans-nft-fw.conf
+        dest: /tmp/nftables_new.conf
+        mode: '0644'
+
+    - name: Validate syntax of the new config (Dry Run)
+      ansible.builtin.command: nft -c -f /tmp/nftables_new.conf
+      register: nft_validation
+      changed_when: false
+
+    - name: Apply new config if validation passed
+      ansible.builtin.copy:
+        src: /tmp/nftables_new.conf
+        dest: /etc/nftables.conf
+        remote_src: true
+        owner: root
+        group: root
+        mode: '0644'
+      when: nft_validation.rc == 0
+
+    - name: Reload and Enable nftables service
+      ansible.builtin.service:
+        name: nftables
+        state: reloaded
+        enabled: true
+      when: nft_validation.rc == 0

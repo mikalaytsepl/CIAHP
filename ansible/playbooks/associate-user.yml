@@ -1,0 +1,41 @@
+---
+- name: Propagate Kubeconfig and Verify Access
+  hosts: "{{ target_cluster }}_managers"
+  become: true
+  vars:
+    primary_manager: "{{ groups[target_cluster + '_managers'][0] }}"
+
+  tasks:
+    - name: Ensure .kube directory exists for the user
+      ansible.builtin.file:
+        path: "/home/{{ target_user }}/.kube"
+        state: directory
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: '0755'
+
+    - name: Slurp config from Primary
+      ansible.builtin.slurp:
+        src: /etc/kubernetes/admin.conf
+      register: kubeconfig_encoded
+      delegate_to: "{{ primary_manager }}"
+      run_once: true
+
+    - name: Write kubeconfig to target user
+      ansible.builtin.copy:
+        content: "{{ kubeconfig_encoded.content | b64decode }}"
+        dest: "/home/{{ target_user }}/.kube/config"
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: '0600'
+
+    - name: Verify kubectl access (via Environment Variable)
+      ansible.builtin.command: kubectl get nodes
+      environment:
+        KUBECONFIG: "/home/{{ target_user }}/.kube/config"
+      changed_when: false
+      register: kubectl_out
+
+    - name: Show Node Status
+      ansible.builtin.debug:
+        msg: "{{ kubectl_out.stdout_lines }}"
