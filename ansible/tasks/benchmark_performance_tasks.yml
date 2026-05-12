@@ -1,0 +1,82 @@
+---
+- name: Add k6 GPG key
+  ansible.builtin.apt_key:
+    url: https://dl.k6.io/key.gpg
+    state: present
+
+- name: Add k6 APT repository
+  ansible.builtin.apt_repository:
+    repo: "deb https://dl.k6.io/deb stable main"
+    state: present
+    update_cache: yes
+
+- name: Install k6
+  ansible.builtin.apt:
+    name: k6
+    state: present
+    lock_timeout: 600
+
+- name: Create k6 load testing script
+  ansible.builtin.copy:
+    dest: /tmp/load_test.js
+    content: |
+      import http from 'k6/http';
+      import { check, sleep } from 'k6';
+      
+      export const options = {
+        vus: 100,          // 100 concurrent users
+        duration: '45s',   // run for 45 seconds
+      };
+      
+      export default function () {
+        const target = `http://127.0.0.1:31111`;
+        
+        let res1 = http.get(`${target}/api/info`);
+        check(res1, { 'status is 200': (r) => r.status === 200 });
+
+        let res2 = http.get(`${target}/delay/1`);
+        
+        let res3 = http.post(`${target}/store`, JSON.stringify({ test: "data" }), {
+            headers: { 'Content-Type': 'application/json' },
+        });
+
+        sleep(0.5);
+      }
+
+- name: Execute k6 Load Test
+  ansible.builtin.command: k6 run /tmp/load_test.js --summary-export=/tmp/k6_summary.json
+  register: k6_output
+
+- name: Save raw console output to text file
+  ansible.builtin.copy:
+    content: "{{ k6_output.stdout }}"
+    dest: /tmp/k6_output.txt
+
+- name: Ensure local reports directory exists
+  ansible.builtin.file:
+    path: ../reports/performance/
+    state: directory
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Fetch k6 JSON Summary back to Ansible controller
+  ansible.builtin.fetch:
+    src: /tmp/k6_summary.json
+    dest: "../reports/performance/k6_summary_{{ inventory_hostname }}.json"
+    flat: yes
+
+- name: Fetch k6 Text Report back to Ansible controller
+  ansible.builtin.fetch:
+    src: /tmp/k6_output.txt
+    dest: "../reports/performance/k6_output_{{ inventory_hostname }}.txt"
+    flat: yes
+
+- name: Clean up remote load test files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/load_test.js
+    - /tmp/k6_summary.json
+    - /tmp/k6_output.txt

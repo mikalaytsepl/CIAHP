@@ -1,0 +1,8 @@
+---
+- name: Benchmark - Application Performance (k6)
+  hosts: "{{ target_cluster }}_workers"
+  become: true
+
+  tasks:
+    - name: Execute k6 Load Test
+      ansible.builtin.import_tasks: ../tasks/benchmark_performance_tasks.yml
