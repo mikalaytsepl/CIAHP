@@ -37,6 +37,11 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    # CIAHP apps
+    'api',
+    'clusters',
+    'operations',
+    'inventory',
 ]
 
 MIDDLEWARE = [
@@ -116,10 +121,7 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
-STATICFILES_DIRS = [
-    BASE_DIR / "static",
-]
-
-# Redirect user after login/logout
-LOGOUT_REDIRECT_URL = '/login/'
-LOGIN_REDIRECT_URL = '/'
+# ── CIAHP paths ──────────────────────────────────────────────────────────────
+# BASE_DIR = webapp/core, so two levels up lands at the repo root
+ANSIBLE_DIR = BASE_DIR.parent.parent / 'ansible'
+INVENTORY_FILE = ANSIBLE_DIR / 'inventory.yml'

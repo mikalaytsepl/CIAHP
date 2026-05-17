@@ -24,7 +24,7 @@
               - ansible_facts.services['kubelet.service'].status == 'enabled'
             fail_msg: "Kubelet service is not enabled or failed, check setup."
             success_msg: "Kubelet service is running, cluster can be initialized."
-    
+
     # --- Cluster Config Check Block ---
     - name: Cluster config file check
       block:
@@ -43,12 +43,14 @@
     # --- Initialization Section ---
     - name: Announce Initialization
       ansible.builtin.debug:
-        msg: "Initializing the cluster with CID: {{ cluster_cidr }}"
+        msg: "Initializing cluster. CIDR: {{ cluster_cidr }} | Endpoint: {{ control_plane_endpoint }}"
 
-    - name: Initializing the cluster 
-      ansible.builtin.command: "kubeadm init --pod-network-cidr={{ cluster_cidr }}"
-
-    # ownership delegation has been cut out, we don't need it anymore
+    - name: Initializing the cluster (HA Ready)
+      ansible.builtin.command: >
+        kubeadm init 
+        --pod-network-cidr={{ cluster_cidr }} 
+        --control-plane-endpoint={{ control_plane_endpoint }}
+        --upload-certs
 
     - name: Installing CNI (calico)
       kubernetes.core.k8s:
@@ -58,36 +60,40 @@
 
     # --- Wait for Components Block ---
     - name: Wait for Cluster Components
-      vars:
-        # just a var for config
-        kubeconfig: "/etc/kubernetes/admin.conf"
       block:
-        - name: Wait for Etcd
-          ansible.builtin.command: >
-            kubectl wait --for=condition=Ready pod -l component=etcd 
-            -n kube-system --timeout=300s --kubeconfig {{ kubeconfig }}
+        - name: Wait for Control Plane Pods to be Running
+          kubernetes.core.k8s_info:
+            kubeconfig: /etc/kubernetes/admin.conf
+            kind: Pod
+            namespace: kube-system
+            label_selectors:
+              - "component={{ item }}"
+          register: pod_info
+          # Loop until the pod exists and its phase is 'Running'
+          until: >
+            pod_info.resources | length > 0 and 
+            pod_info.resources[0].status.phase == 'Running'
+          retries: 60
+          delay: 5
+          loop:
+            - etcd
+            - kube-apiserver
+            - kube-controller-manager
+            - kube-scheduler
 
-        - name: Wait for API Server
-          ansible.builtin.command: >
-            kubectl wait --for=condition=Ready pod -l component=kube-apiserver 
-            -n kube-system --timeout=300s --kubeconfig {{ kubeconfig }}
-
-        - name: Wait for Controller Manager
-          ansible.builtin.command: >
-            kubectl wait --for=condition=Ready pod -l component=kube-controller-manager 
-            -n kube-system --timeout=300s --kubeconfig {{ kubeconfig }}
-
-        - name: Wait for Scheduler
-          ansible.builtin.command: >
-            kubectl wait --for=condition=Ready pod -l component=kube-scheduler 
-            -n kube-system --timeout=300s --kubeconfig {{ kubeconfig }}
-
-        - name: Wait for Calico CNI
-          ansible.builtin.command: >
-            kubectl wait --for=condition=Ready pod -l k8s-app=calico-node 
-            -n kube-system --timeout=300s --kubeconfig {{ kubeconfig }}
-
-        - name: Wait for CoreDNS
-          ansible.builtin.command: >
-            kubectl wait --for=condition=Ready pod -l k8s-app=kube-dns 
-            -n kube-system --timeout=300s --kubeconfig {{ kubeconfig }}
+        - name: Wait for Calico and CoreDNS to be Running
+          kubernetes.core.k8s_info:
+            kubeconfig: /etc/kubernetes/admin.conf
+            kind: Pod
+            namespace: kube-system
+            label_selectors:
+              - "k8s-app={{ item }}"
+          register: addon_info
+          until: >
+            addon_info.resources | length > 0 and 
+            addon_info.resources[0].status.phase == 'Running'
+          retries: 60
+          delay: 5
+          loop:
+            - calico-node
+            - kube-dns

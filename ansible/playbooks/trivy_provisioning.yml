@@ -1,0 +1,11 @@
+---
+- name: Set up trivy scan on remote node and provision
+  hosts: "{{ target_node }}"
+  become: true
+
+  tasks: 
+    - name: Run general trivy setup for the node
+      ansible.builtin.import_tasks: ../tasks/setup_trivy.yml
+
+    - name: Verify trivy presense, execute the scan and retrieve results
+      ansible.builtin.import_tasks: ../tasks/run_trivy_scan.yml

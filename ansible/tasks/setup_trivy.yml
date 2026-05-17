@@ -1,0 +1,27 @@
+---
+- name: Install tools needed 
+  ansible.builtin.apt:
+    pkg:
+      - wget
+      - apt-transport-https
+      - gnupg
+      - lsb-release
+    state: present
+
+- name: Add trivy GPG key
+  ansible.builtin.get_url:
+    url: https://aquasecurity.github.io/trivy-repo/deb/public.key
+    dest: /etc/apt/keyrings/trivy.asc
+    mode: '0644'
+
+- name: Add Trivy repo
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/trivy.asc] https://aquasecurity.github.io/trivy-repo/deb {{ ansible_distribution_release }} main"
+    filename: trivy
+    state: present
+    update_cache: yes
+
+- name: Install Trivy
+  ansible.builtin.apt:
+    name: trivy
+    state: present

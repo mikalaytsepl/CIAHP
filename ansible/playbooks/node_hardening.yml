@@ -1,0 +1,16 @@
+---
+- name: Secure K8S nodes
+  hosts: "{{ target_node }} | default({ target_cluster })"
+  become: true
+
+  tasks:
+    - name: Execute Hardening Tasks
+      ansible.builtin.import_tasks: ../tasks/hardening_task.yml
+
+  handlers:
+    - name: Restart SSH Service
+      ansible.builtin.systemd:
+        name: sshd
+        state: restarted
+
+    # - name: Restart Auditd

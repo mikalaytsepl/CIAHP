@@ -1,0 +1,60 @@
+---
+- name: Determine an active manager to run commands from
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Ensure target_node is provided
+      ansible.builtin.assert:
+        that: target_node is defined
+        fail_msg: "Please provide the target_node variable"
+
+    - name: Ensure target_cluster is provided
+      ansible.builtin.assert:
+        that: target_cluster is defined
+        fail_msg: "Please provide the target_cluster variable"
+
+    - name: Select an execution manager (a manager that is NOT the target node)
+      ansible.builtin.set_fact:
+        exec_manager: "{{ (groups[target_cluster + '_managers'] | difference([target_node])) | first | default(none) }}"
+
+    - name: Fail if no other managers are available
+      ansible.builtin.fail:
+        msg: "Cannot delete the last remaining manager using this playbook! Use delete_cluster.yml to destroy the whole cluster."
+      when: not exec_manager
+
+
+- name: Drain the target node
+  hosts: "{{ hostvars['localhost']['exec_manager'] }}"
+  become: true
+  tasks:
+    - name: Drain the node
+      kubernetes.core.k8s_drain:
+        kubeconfig: /etc/kubernetes/admin.conf
+        name: "{{ target_node }}"
+        state: drain
+        delete_options:
+          force: yes
+          ignore_daemonsets: yes
+          delete_emptydir_data: yes
+      ignore_errors: true
+
+
+- name: Wipe the target node cleanly
+  hosts: "{{ target_node }}"
+  become: true
+  tasks:
+    - name: Execute node cleanup
+      ansible.builtin.import_tasks: ../tasks/cleanup_node.yml
+
+
+- name: Remove node from Kubernetes API
+  hosts: "{{ hostvars['localhost']['exec_manager'] }}"
+  become: true
+  tasks:
+    - name: Delete the node from the cluster
+      kubernetes.core.k8s:
+        kubeconfig: /etc/kubernetes/admin.conf
+        kind: Node
+        name: "{{ target_node }}"
+        state: absent
+      ignore_errors: true

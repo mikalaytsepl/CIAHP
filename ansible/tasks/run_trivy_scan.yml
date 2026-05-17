@@ -1,0 +1,39 @@
+- name: Verify if Trivy is present 
+  ansible.builtin.command: which trivy
+  register: trivy_check
+  ignore_errors: true
+  changed_when: false
+
+- name: Stop if Trivy is not there
+  ansible.builtin.fail:
+    msg: "FATAL: Trivy is not present on {{ inventory_hostname }}! Troubleshoot, or run setup again."
+  when: trivy_check.rc != 0 
+
+- name: Create Trivy directory on the remote host
+  ansible.builtin.file:
+    path: "/home/ansible/audit/trivy" 
+    state: directory
+    mode: '0755'
+
+- name: Get time and date for report 
+  ansible.builtin.command: date +%m-%d-%y-%H-%M
+  register: starttimestamp  
+  changed_when: false
+
+- name: Trivy is present, running scan
+  ansible.builtin.command: 
+    cmd: >
+      trivy fs /
+      --format json
+      --output /home/ansible/audit/trivy/{{ inventory_hostname }}_{{ starttimestamp.stdout }}.json
+      --scanners vuln 
+      --severity HIGH,CRITICAL 
+  async: 300
+  poll: 5
+  changed_when: true
+
+- name: Get scan report back to controller
+  ansible.builtin.fetch: 
+    src: "/home/ansible/audit/trivy/{{ inventory_hostname }}_{{ starttimestamp.stdout }}.json"
+    dest: "./audit/trivy/{{ inventory_hostname }}_{{ starttimestamp.stdout }}.json"
+    flat: yes

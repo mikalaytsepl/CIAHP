@@ -1,0 +1,84 @@
+---
+- name: Install HA services and dependencies
+  ansible.builtin.apt:
+    name: 
+      - haproxy
+      - keepalived
+      - psmisc  # Added this to ensure the 'killall' command exists
+    state: present
+    update_cache: yes
+
+- name: Configure HAProxy
+  ansible.builtin.copy:
+    dest: /etc/haproxy/haproxy.cfg
+    content: |
+      global
+          log /dev/log local0
+          daemon
+      defaults
+          mode tcp
+          timeout connect 5000ms
+          timeout client 50000ms
+          timeout server 50000ms
+      frontend k8s-api
+          bind *:8443
+          default_backend k8s-api-nodes
+      backend k8s-api-nodes
+          balance roundrobin
+          {% for host in groups[target_cluster + '_managers'] %}
+          server {{ host }} {{ hostvars[host]['ansible_host'] }}:6443 check
+          {% endfor %}
+  register: haproxy_config
+
+- name: Configure Keepalived
+  ansible.builtin.copy:
+    dest: /etc/keepalived/keepalived.conf
+    content: |
+      global_defs {
+          script_user root
+          enable_script_security
+      }
+
+      vrrp_script check_haproxy {
+          script "/usr/bin/killall -0 haproxy"
+          interval 2
+          weight 20
+      }
+
+      vrrp_instance VI_1 {
+          state {% if inventory_hostname == groups[target_cluster + '_managers'][0] %}MASTER{% else %}BACKUP{% endif %}
+          
+          # Added a fallback to 'eth0' in case the ansible fact is empty
+          interface {{ ansible_default_ipv4.interface | default('eth0') }}
+          virtual_router_id 51
+          priority {% if inventory_hostname == groups[target_cluster + '_managers'][0] %}150{% else %}100{% endif %}
+          
+          # Strict multiline formatting required by Keepalived
+          virtual_ipaddress {
+              {{ cluster_vip }}
+          }
+          
+          track_script {
+              check_haproxy
+          }
+      }
+  register: keepalived_config
+
+- name: Restart HA services if configuration changed
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+    enabled: yes
+  loop: 
+    - haproxy
+    - keepalived
+  when: haproxy_config.changed or keepalived_config.changed
+
+- name: Ensure HA services are running
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: yes
+  loop:
+    - haproxy
+    - keepalived
