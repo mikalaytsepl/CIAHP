@@ -18,6 +18,7 @@ class NodeOut(Schema):
     name:       str
     ip:         str
     role:       str
+    status:     str
     created_at: datetime
 
 
@@ -47,6 +48,15 @@ class NodeIn(Schema):
     name: str
     ip:   str
     role: str   # "manager" | "worker"
+
+
+class NodeDeployOut(Schema):
+    id:           int
+    name:         str
+    ip:           str
+    role:         str
+    created_at:   datetime
+    operation_id: str
 
 
 # ── Action input schemas ─────────────────────────────────────────────────────

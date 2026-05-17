@@ -42,14 +42,18 @@ def _execute(op_id, playbook: str, extra_vars: dict):
     ansible_dir = _get_ansible_dir()
     inventory_file = Path(settings.INVENTORY_FILE)
 
+    # node_id is internal tracking — strip it before passing to ansible-playbook
+    node_id = extra_vars.get("node_id")
+    ansible_vars = {k: v for k, v in extra_vars.items() if k != "node_id"}
+
     cmd = [
         "ansible-playbook",
         str(ansible_dir / "playbooks" / playbook),
         "-i", str(inventory_file),
     ]
 
-    if extra_vars:
-        cmd += ["--extra-vars", _to_extra_vars_str(extra_vars)]
+    if ansible_vars:
+        cmd += ["--extra-vars", _to_extra_vars_str(ansible_vars)]
 
     try:
         result = subprocess.run(
@@ -71,3 +75,18 @@ def _execute(op_id, playbook: str, extra_vars: dict):
 
     op.finished_at = timezone.now()
     op.save(update_fields=["stdout", "stderr", "return_code", "status", "finished_at"])
+
+    # Update the node's status to reflect the playbook result
+    if node_id:
+        from django.db import close_old_connections
+        close_old_connections()
+        try:
+            from clusters.models import Node
+            node_obj = Node.objects.get(id=int(node_id))
+            node_obj.status = (
+                Node.Status.HEALTHY if op.status == Operation.Status.SUCCESS
+                else Node.Status.ERROR
+            )
+            node_obj.save(update_fields=["status"])
+        except Exception as e:
+            print(f"[runner] Failed to update node {node_id} status: {e}")

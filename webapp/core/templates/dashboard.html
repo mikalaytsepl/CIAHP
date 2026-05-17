@@ -14,14 +14,14 @@
 
 <div class="page-header">
   <h1 class="page-header__title">Widok Główny</h1>
-  <p class="page-header__sub">Monitoruj stan bezpieczeństwa i wydajności klastra Monolith w czasie rzeczywistym.</p>
+  <p class="page-header__sub">Monitoruj stan bezpieczeństwa i wydajności klastra w czasie rzeczywistym.</p>
 </div>
 
 <!-- Stat Cards -->
 <div class="stat-cards">
 
   <!-- Wszystkie Instancje -->
-  <div class="stat-card" data-status="healthy">
+  <div class="stat-card"{% if total_status.0 %} data-status="{{ total_status.0 }}"{% endif %}>
     <div class="stat-card__header">
       <div class="stat-card__icon">
         <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -36,17 +36,19 @@
           <line x1="6.34" y1="17.66" x2="4.22" y2="19.78"/>
         </svg>
       </div>
+      {% if total_status.0 %}
       <div class="stat-card__status">
         <span class="status-dot"></span>
-        <span>HEALTHY</span>
+        <span>{{ total_status.1 }}</span>
       </div>
+      {% endif %}
     </div>
     <div class="stat-card__label">Wszystkie Instancje</div>
-    <div class="stat-card__value">128</div>
+    <div class="stat-card__value">{{ total_nodes }}</div>
   </div>
 
   <!-- Managery -->
-  <div class="stat-card" data-status="deploying">
+  <div class="stat-card"{% if manager_status.0 %} data-status="{{ manager_status.0 }}"{% endif %}>
     <div class="stat-card__header">
       <div class="stat-card__icon">
         <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -56,17 +58,19 @@
           <line x1="12" y1="20" x2="12.01" y2="20"/>
         </svg>
       </div>
+      {% if manager_status.0 %}
       <div class="stat-card__status">
         <span class="status-dot"></span>
-        <span>DEPLOYING</span>
+        <span>{{ manager_status.1 }}</span>
       </div>
+      {% endif %}
     </div>
     <div class="stat-card__label">Managery</div>
-    <div class="stat-card__value">12</div>
+    <div class="stat-card__value">{{ manager_count }}</div>
   </div>
 
   <!-- Workerzy -->
-  <div class="stat-card" data-status="error">
+  <div class="stat-card"{% if worker_status.0 %} data-status="{{ worker_status.0 }}"{% endif %}>
     <div class="stat-card__header">
       <div class="stat-card__icon">
         <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -82,13 +86,15 @@
           <line x1="20" y1="15" x2="22" y2="15"/>
         </svg>
       </div>
+      {% if worker_status.0 %}
       <div class="stat-card__status">
         <span class="status-dot"></span>
-        <span>ERROR</span>
+        <span>{{ worker_status.1 }}</span>
       </div>
+      {% endif %}
     </div>
     <div class="stat-card__label">Workerzy</div>
-    <div class="stat-card__value">116</div>
+    <div class="stat-card__value">{{ worker_count }}</div>
   </div>
 
 </div>
@@ -100,75 +106,63 @@
 
 <div class="activity-list">
 
-  <div class="activity-item" data-status="healthy">
+  {% for op in recent_ops %}
+  <div class="activity-item" data-status="{{ op.ui_status }}">
     <div class="activity-item__icon">
+
+      {% if op.icon == 'add' %}
       <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="10"/>
         <line x1="12" y1="8" x2="12" y2="16"/>
         <line x1="8" y1="12" x2="16" y2="12"/>
       </svg>
-    </div>
-    <div class="activity-item__info">
-      <div class="activity-item__title">Dodano Workera</div>
-      <div class="activity-item__sub">ID: worker-node-af29 | Cluster: EU-WEST-1</div>
-    </div>
-    <div class="activity-item__right">
-      <span class="activity-item__time">12:48:02</span>
-      <span class="activity-badge">HEALTHY</span>
-    </div>
-  </div>
-
-  <div class="activity-item" data-status="deploying">
-    <div class="activity-item__icon">
+      {% elif op.icon == 'shield' %}
       <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
       </svg>
-    </div>
-    <div class="activity-item__info">
-      <div class="activity-item__title">Zakończono utwardzanie serwera X</div>
-      <div class="activity-item__sub">POLICY: NIST-800-53 | Node: SRV-PROD-99</div>
-    </div>
-    <div class="activity-item__right">
-      <span class="activity-item__time">11:30:15</span>
-      <span class="activity-badge">DEPLOYING</span>
-    </div>
-  </div>
-
-  <div class="activity-item" data-status="error">
-    <div class="activity-item__icon">
+      {% elif op.icon == 'warning' %}
       <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
         <line x1="12" y1="9" x2="12" y2="13"/>
         <line x1="12" y1="17" x2="12.01" y2="17"/>
       </svg>
-    </div>
-    <div class="activity-item__info">
-      <div class="activity-item__title">Próba nieautoryzowanego dostępu</div>
-      <div class="activity-item__sub">IP: 192.168.1.105 | SSH Brute Force Blocked</div>
-    </div>
-    <div class="activity-item__right">
-      <span class="activity-item__time">09:12:44</span>
-      <span class="activity-badge">ERROR</span>
-    </div>
-  </div>
-
-  <div class="activity-item" data-status="healthy">
-    <div class="activity-item__icon">
+      {% else %}
       <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/>
         <polyline points="1 20 1 14 7 14"/>
         <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
       </svg>
+      {% endif %}
+
     </div>
     <div class="activity-item__info">
-      <div class="activity-item__title">Restart kontenera managera</div>
-      <div class="activity-item__sub">ID: manager-01-core | Update: Security Patch</div>
+      <div class="activity-item__title">{{ op.title }}</div>
+      <div class="activity-item__sub">{{ op.details }}</div>
     </div>
     <div class="activity-item__right">
-      <span class="activity-item__time">08:05:12</span>
-      <span class="activity-badge">HEALTHY</span>
+      <span class="activity-item__time">{{ op.time|time:"H:i:s" }}</span>
+      <span class="activity-badge">{{ op.badge }}</span>
     </div>
   </div>
+  {% empty %}
+  <div class="activity-item" data-status="healthy">
+    <div class="activity-item__icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+    </div>
+    <div class="activity-item__info">
+      <div class="activity-item__title">Brak aktywności</div>
+      <div class="activity-item__sub">Operacje pojawią się tutaj po pierwszym wdrożeniu.</div>
+    </div>
+    <div class="activity-item__right">
+      <span class="activity-item__time">—</span>
+      <span class="activity-badge" style="color: var(--text-muted); border-color: var(--border);">—</span>
+    </div>
+  </div>
+  {% endfor %}
 
 </div>
 

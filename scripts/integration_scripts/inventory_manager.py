@@ -111,6 +111,7 @@ class InventoryManager():
 
             self._save(inv)
             print(f"Successfully added {name} ({ip}) to {cluster_name} as a {role[:-1]}.")
+            return name
 
     def delete_host(self, name: str, cluster_name: str, role: Literal["managers", "workers"]):
             inv = self._load()

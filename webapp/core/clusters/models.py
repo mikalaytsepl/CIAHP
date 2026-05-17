@@ -21,10 +21,16 @@ class Node(models.Model):
         MANAGER = "manager", "Manager"
         WORKER  = "worker",  "Worker"
 
+    class Status(models.TextChoices):
+        DEPLOYING = "deploying", "Deploying"
+        HEALTHY   = "healthy",   "Healthy"
+        ERROR     = "error",     "Error"
+
     cluster    = models.ForeignKey(Cluster, on_delete=models.CASCADE, related_name="nodes")
-    name       = models.CharField(max_length=128)   # ansible hostname (with random suffix)
+    name       = models.CharField(max_length=128)
     ip         = models.GenericIPAddressField()
     role       = models.CharField(max_length=16, choices=Role.choices, db_index=True)
+    status     = models.CharField(max_length=16, choices=Status.choices, default=Status.DEPLOYING, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

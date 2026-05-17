@@ -43,6 +43,7 @@ from .schemas import (
     DeployManagerIn,
     HardenIn,
     ManageUsersIn,
+    NodeDeployOut,
     NodeIn,
     NodeOut,
     SetHaVarsIn,
@@ -108,7 +109,7 @@ def list_nodes(request, cluster_name: str):
     return list(cluster.nodes.all())
 
 
-@clusters_router.post("/{cluster_name}/nodes/", response=NodeOut, summary="Add node to cluster")
+@clusters_router.post("/{cluster_name}/nodes/", response=NodeDeployOut, summary="Add node to cluster and deploy")
 def add_node_endpoint(request, cluster_name: str, body: NodeIn):
     cluster = get_object_or_404(Cluster, name=cluster_name)
     if body.role not in ("manager", "worker"):
@@ -117,7 +118,35 @@ def add_node_endpoint(request, cluster_name: str, body: NodeIn):
         node = add_node(cluster=cluster, name=body.name, ip=body.ip, role=body.role)
     except ValueError as e:
         raise HttpError(400, str(e))
-    return node
+
+    # Trigger the appropriate playbook immediately after registering the node
+    if node.role == "manager":
+        existing_managers = cluster.nodes.filter(role="manager").exclude(id=node.id).count()
+        if existing_managers == 0:
+            op = run_playbook("deploy_main_manager.yml", {
+                "target_cluster": cluster_name,
+                "cluster_cidr":   cluster.cluster_cidr,
+                "kube_version":   cluster.kube_version,
+                "node_id":        node.id,
+            })
+        else:
+            op = run_playbook("deploy_additional_manager.yml", {
+                "target_cluster": cluster_name,
+                "target_node":    node.name,
+                "node_id":        node.id,
+            })
+    else:
+        op = run_playbook("deploy_worker.yml", {
+            "target_cluster": cluster_name,
+            "target_node":    node.name,
+            "node_id":        node.id,
+        })
+
+    return NodeDeployOut(
+        id=node.id, name=node.name, ip=node.ip,
+        role=node.role, created_at=node.created_at,
+        operation_id=str(op.id),
+    )
 
 
 @clusters_router.delete(

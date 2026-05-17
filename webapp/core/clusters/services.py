@@ -9,6 +9,7 @@ Responsibilities:
 from django.conf import settings
 
 from .models import Cluster, Node
+from operations.models import Operation
 
 
 def _get_inventory_manager():
@@ -36,6 +37,11 @@ def create_cluster(name: str, cluster_cidr: str, vip_address: str | None, kube_v
     if vip_address:
         mgr = _get_inventory_manager()
         mgr.set_cluster_ha_vars(cluster_name=name, vip_address=vip_address)
+    Operation.objects.create(
+        playbook="create-cluster",
+        extra_vars={"target_cluster": name, "cluster_cidr": cluster_cidr},
+        status=Operation.Status.SUCCESS,
+    )
     return cluster
 
 
@@ -46,6 +52,11 @@ def delete_cluster_record(cluster: Cluster) -> None:
         inv_mgr.truncate_cluster_resources(cluster.name)
     except Exception:
         pass  # Inventory may already be empty; proceed with DB delete
+    Operation.objects.create(
+        playbook="delete-cluster",
+        extra_vars={"target_cluster": cluster.name},
+        status=Operation.Status.SUCCESS,
+    )
     cluster.delete()
 
 
@@ -58,13 +69,18 @@ def add_node(cluster: Cluster, name: str, ip: str, role: str) -> Node:
     """
     ansible_role = "managers" if role == "manager" else "workers"
     mgr = _get_inventory_manager()
-    mgr.add_host(name=name, ip=ip, cluster_name=cluster.name, role=ansible_role)
+    inventory_name = mgr.add_host(name=name, ip=ip, cluster_name=cluster.name, role=ansible_role)
 
     node = Node.objects.create(
         cluster=cluster,
-        name=name,
+        name=inventory_name,  # use the suffixed name that inventory actually stored
         ip=ip,
         role=role,
+    )
+    Operation.objects.create(
+        playbook="add-node",
+        extra_vars={"target_cluster": cluster.name, "node": node.name, "ip": ip, "role": role},
+        status=Operation.Status.SUCCESS,
     )
     return node
 
@@ -77,4 +93,9 @@ def remove_node(cluster: Cluster, node: Node) -> None:
         mgr.delete_host(name=node.name, cluster_name=cluster.name, role=ansible_role)
     except ValueError:
         pass  # Host may have been manually removed from inventory; proceed
+    Operation.objects.create(
+        playbook="remove-node",
+        extra_vars={"target_cluster": cluster.name, "node": node.name, "role": node.role},
+        status=Operation.Status.SUCCESS,
+    )
     node.delete()

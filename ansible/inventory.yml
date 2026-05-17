@@ -1,0 +1,26 @@
+all:
+    children:
+        global_managers:
+            children:
+                test-cluster_managers: {}
+                k8s-cluster_managers: {}
+        global_workers:
+            children:
+                test-cluster_workers: {}
+        clusters:
+            children:
+                test-cluster:
+                    children:
+                        test-cluster_workers:
+                            hosts: {}
+                        test-cluster_managers:
+                            hosts: {}
+                k8s-cluster:
+                    children:
+                        k8s-cluster_managers:
+                            hosts:
+                                test-6apgf:
+                                    ansible_host: 192.168.100.12
+                    vars:
+                        cluster_vip: 192.168.100.100
+                        control_plane_endpoint: 192.168.100.100:8443

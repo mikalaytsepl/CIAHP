@@ -208,3 +208,5 @@ __marimo__/
 
 # Other stuff
 users-list.txt
+
+/ansible/collections

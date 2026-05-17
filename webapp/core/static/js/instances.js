@@ -2,6 +2,12 @@
 
 document.addEventListener('DOMContentLoaded', () => {
 
+  /* ── CSRF ── */
+  function getCsrf() {
+    const token = document.querySelector('[name=csrfmiddlewaretoken]');
+    return token ? token.value : '';
+  }
+
   /* ── IP VALIDATION ── */
   const IP_REGEX = /^((25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(25[0-5]|2[0-4]\d|[01]?\d\d?)$/;
 
@@ -9,8 +15,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const ipError = document.getElementById('ip-error');
 
   function validateIP(value) {
-    if (value === '') return null;           // empty field — skip validation
-    return IP_REGEX.test(value.trim());     // true = valid, false = invalid
+    if (value === '') return null;
+    return IP_REGEX.test(value.trim());
   }
 
   function updateIPState(valid) {
@@ -28,28 +34,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Real-time: validate on each keystroke with a short debounce
   let ipDebounce;
   ipInput.addEventListener('input', () => {
     clearTimeout(ipDebounce);
-    // clear state immediately if field is empty
     if (ipInput.value === '') { updateIPState(null); return; }
     ipDebounce = setTimeout(() => updateIPState(validateIP(ipInput.value)), 400);
   });
 
-  // Also validate on blur
   ipInput.addEventListener('blur', () => {
     updateIPState(validateIP(ipInput.value));
-  });
-
-  // Block form submission if IP is invalid
-  document.getElementById('instance-form').addEventListener('submit', e => {
-    const valid = validateIP(ipInput.value);
-    if (valid === null || valid === false) {
-      e.preventDefault();
-      updateIPState(false);
-      ipInput.focus();
-    }
   });
 
   /* ── ROLE TOGGLE ── */
@@ -72,12 +65,9 @@ document.addEventListener('DOMContentLoaded', () => {
     card.addEventListener('click', () => {
       authCards.forEach(c => c.classList.remove('active'));
       card.classList.add('active');
-
-      const method = card.dataset.method;
-      authInput.value = method;
-
+      authInput.value = card.dataset.method;
       document.querySelectorAll('.auth-fields').forEach(f => f.classList.remove('visible'));
-      document.getElementById('auth-' + method).classList.add('visible');
+      document.getElementById('auth-' + card.dataset.method).classList.add('visible');
     });
   });
 
@@ -93,6 +83,126 @@ document.addEventListener('DOMContentLoaded', () => {
     row.addEventListener('click', () => {
       row.closest('.sub-group').classList.toggle('open');
     });
+  });
+
+  /* ── FORM SUBMIT → API ── */
+  const form       = document.getElementById('instance-form');
+  const submitBtn  = form.querySelector('.submit-btn');
+  const formError  = document.getElementById('form-error');
+  const origBtnHTML = submitBtn.innerHTML;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const valid = validateIP(ipInput.value);
+    if (!valid) {
+      updateIPState(false);
+      ipInput.focus();
+      return;
+    }
+
+    const cluster = document.getElementById('inst-cluster').value;
+    if (!cluster) {
+      formError.textContent = 'Wybierz klaster.';
+      formError.style.display = 'block';
+      return;
+    }
+
+    formError.style.display = 'none';
+    submitBtn.disabled = true;
+    submitBtn.textContent = '[ Dodawanie… ]';
+
+    const body = {
+      name: document.getElementById('inst-name').value.trim(),
+      ip:   ipInput.value.trim(),
+      role: roleInput.value,
+    };
+
+    try {
+      const resp = await fetch(`/api/clusters/${cluster}/nodes/`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+        body:    JSON.stringify(body),
+      });
+
+      if (resp.ok) {
+        window.location.href = '/instances/';
+      } else {
+        const data = await resp.json().catch(() => ({}));
+        formError.textContent = data.detail || `Błąd serwera (${resp.status}).`;
+        formError.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = origBtnHTML;
+      }
+    } catch (err) {
+      formError.textContent = `Błąd połączenia: ${err.message}`;
+      formError.style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = origBtnHTML;
+    }
+  });
+
+  /* ── DELETE NODE ── */
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.delete-node-btn');
+    if (!btn) return;
+
+    const cluster = btn.dataset.cluster;
+    const node    = btn.dataset.node;
+    if (!confirm(`Usunąć węzeł "${node}" z klastra "${cluster}"?`)) return;
+
+    btn.disabled = true;
+
+    try {
+      const resp = await fetch(`/api/clusters/${cluster}/nodes/${node}/`, {
+        method:  'DELETE',
+        headers: { 'X-CSRFToken': getCsrf() },
+      });
+
+      if (resp.ok) {
+        window.location.href = '/instances/';
+      } else {
+        const data = await resp.json().catch(() => ({}));
+        alert(`Błąd usuwania (${resp.status}): ${data.detail || resp.statusText}`);
+        btn.disabled = false;
+      }
+    } catch (err) {
+      alert(`Błąd połączenia: ${err.message}`);
+      btn.disabled = false;
+    }
+  });
+
+  /* ── DELETE CLUSTER ── */
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.btn-remove');
+    if (!btn) return;
+
+    // stop collapse toggle from firing
+    e.stopPropagation();
+
+    const clusterItem = btn.closest('.cluster-item');
+    const cluster     = clusterItem.dataset.cluster;
+    if (!confirm(`Usunąć klaster "${cluster}" i wszystkie jego węzły z bazy?\n\nUwaga: nie uruchamia to playbooków — fizyczne węzły pozostają bez zmian.`)) return;
+
+    btn.disabled = true;
+
+    try {
+      const resp = await fetch(`/api/clusters/${cluster}/`, {
+        method:  'DELETE',
+        headers: { 'X-CSRFToken': getCsrf() },
+      });
+
+      if (resp.ok || resp.status === 204) {
+        window.location.href = '/instances/';
+      } else {
+        const data = await resp.json().catch(() => ({}));
+        alert(`Błąd usuwania klastra (${resp.status}): ${data.detail || resp.statusText}`);
+        btn.disabled = false;
+      }
+    } catch (err) {
+      alert(`Błąd połączenia: ${err.message}`);
+      btn.disabled = false;
+    }
   });
 
 });

@@ -57,8 +57,11 @@
           <label class="form-label" for="inst-cluster">Przypisanie do Klastra</label>
           <select class="form-select" id="inst-cluster" name="cluster" required>
             <option value="" disabled selected>Wybierz klaster…</option>
-            <option value="monolith">The Monolith Cluster (10.0.1.5)</option>
-            <option value="cluster-b">Cluster-B (10.0.2.1)</option>
+            {% for c in clusters %}
+            <option value="{{ c.obj.name }}">{{ c.obj.name }}{% if c.obj.vip_address %} (VIP: {{ c.obj.vip_address }}){% endif %}</option>
+            {% empty %}
+            <option disabled>Brak klastrów — utwórz najpierw klaster przez API</option>
+            {% endfor %}
           </select>
         </div>
 
@@ -101,6 +104,9 @@
           </div>
         </div>
 
+        <!-- API error feedback -->
+        <div id="form-error" style="display:none; color:var(--red); font-size:0.8rem; margin-bottom:0.75rem;"></div>
+
         <button class="submit-btn" type="submit">
           <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -127,20 +133,22 @@
         <span class="structure-panel__title">Klastry</span>
       </div>
 
-      <!-- Cluster 1 -->
-      <div class="cluster-item open">
+      {% for c in clusters %}
+      <div class="cluster-item open" data-cluster="{{ c.obj.name }}">
         <div class="cluster-row">
           <svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
                fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="6 9 12 15 18 9"/>
           </svg>
           <div class="cluster-info">
-            <div class="cluster-name">The Monolith Cluster</div>
-            <div class="cluster-meta">Global Production Zone · 2 Managers, 2 Workers</div>
+            <div class="cluster-name">{{ c.obj.name }}</div>
+            <div class="cluster-meta">{{ c.obj.cluster_cidr }} · {{ c.manager_count }} Manager{{ c.manager_count|pluralize:"s" }}, {{ c.worker_count }} Worker{{ c.worker_count|pluralize:"s" }}</div>
           </div>
           <div class="cluster-actions">
             <button class="btn-remove" type="button">Usuń</button>
-            <span class="status-badge" data-status="healthy">Healthy</span>
+            {% if c.ui_status %}
+            <span class="status-badge" data-status="{{ c.ui_status }}">{{ c.status_label }}</span>
+            {% endif %}
           </div>
         </div>
 
@@ -154,18 +162,19 @@
                 <polyline points="6 9 12 15 18 9"/>
               </svg>
               <span class="sub-group-label">Managers</span>
-              <span class="sub-group-count">2</span>
+              <span class="sub-group-count">{{ c.manager_count }}</span>
             </div>
             <div class="sub-group-body">
-
+              {% for node in c.managers %}
               <div class="instance-item">
                 <div class="instance-info">
-                  <div class="instance-name">CLUSTER-ADM-01</div>
-                  <div class="instance-meta">10.0.1.5</div>
+                  <div class="instance-name">{{ node.name }}</div>
+                  <div class="instance-meta">{{ node.ip }} · manager</div>
                 </div>
                 <div class="instance-actions">
-                  <span class="status-badge" data-status="healthy">Healthy</span>
-                  <button class="icon-btn" type="button" title="Usuń">
+                  <span class="status-badge" data-status="{{ node.status }}">{{ node.get_status_display }}</span>
+                  <button class="icon-btn delete-node-btn" type="button"
+                          data-node="{{ node.name }}" data-cluster="{{ c.obj.name }}" title="Usuń">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <polyline points="3 6 5 6 21 6"/>
@@ -176,26 +185,9 @@
                   </button>
                 </div>
               </div>
-
-              <div class="instance-item">
-                <div class="instance-info">
-                  <div class="instance-name">CORE-ENGINE-01</div>
-                  <div class="instance-meta">192.168.1.10</div>
-                </div>
-                <div class="instance-actions">
-                  <span class="status-badge" data-status="error">Error</span>
-                  <button class="icon-btn" type="button" title="Usuń">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
-                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <polyline points="3 6 5 6 21 6"/>
-                      <path d="M19 6l-1 14H6L5 6"/>
-                      <path d="M10 11v6M14 11v6"/>
-                      <path d="M9 6V4h6v2"/>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
+              {% empty %}
+              <div style="padding: 0.5rem 0.75rem; color: var(--text-muted); font-size: 0.8rem;">Brak managerów.</div>
+              {% endfor %}
             </div>
           </div>
 
@@ -207,18 +199,19 @@
                 <polyline points="6 9 12 15 18 9"/>
               </svg>
               <span class="sub-group-label">Workers</span>
-              <span class="sub-group-count">2</span>
+              <span class="sub-group-count">{{ c.worker_count }}</span>
             </div>
             <div class="sub-group-body">
-
+              {% for node in c.workers %}
               <div class="instance-item">
                 <div class="instance-info">
-                  <div class="instance-name">WORKER-S-01</div>
-                  <div class="instance-meta">10.0.3.10</div>
+                  <div class="instance-name">{{ node.name }}</div>
+                  <div class="instance-meta">{{ node.ip }} · worker</div>
                 </div>
                 <div class="instance-actions">
-                  <span class="status-badge" data-status="healthy">Healthy</span>
-                  <button class="icon-btn" type="button" title="Usuń">
+                  <span class="status-badge" data-status="{{ node.status }}">{{ node.get_status_display }}</span>
+                  <button class="icon-btn delete-node-btn" type="button"
+                          data-node="{{ node.name }}" data-cluster="{{ c.obj.name }}" title="Usuń">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <polyline points="3 6 5 6 21 6"/>
@@ -229,53 +222,19 @@
                   </button>
                 </div>
               </div>
-
-              <div class="instance-item">
-                <div class="instance-info">
-                  <div class="instance-name">WORKER-S-02</div>
-                  <div class="instance-meta">10.0.3.11</div>
-                </div>
-                <div class="instance-actions">
-                  <span class="status-badge" data-status="deploying">Deploying</span>
-                  <button class="icon-btn" type="button" title="Usuń">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
-                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <polyline points="3 6 5 6 21 6"/>
-                      <path d="M19 6l-1 14H6L5 6"/>
-                      <path d="M10 11v6M14 11v6"/>
-                      <path d="M9 6V4h6v2"/>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
+              {% empty %}
+              <div style="padding: 0.5rem 0.75rem; color: var(--text-muted); font-size: 0.8rem;">Brak workerów.</div>
+              {% endfor %}
             </div>
           </div>
 
         </div>
       </div>
-      <!-- / Cluster 1 -->
-
-      <!-- Cluster 2 (placeholder) -->
-      <div class="cluster-item">
-        <div class="cluster-row">
-          <svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
-               fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="6 9 12 15 18 9"/>
-          </svg>
-          <div class="cluster-info">
-            <div class="cluster-name">Cluster-B</div>
-            <div class="cluster-meta">Staging Zone · 0 Managers, 0 Workers</div>
-          </div>
-          <div class="cluster-actions">
-            <button class="btn-remove" type="button">Usuń</button>
-            <span class="status-badge" data-status="deploying">Deploying</span>
-          </div>
-        </div>
-        <div class="cluster-body">
-          <!-- empty — no instances -->
-        </div>
+      {% empty %}
+      <div style="padding: 1.5rem; color: var(--text-muted); font-size: 0.85rem; text-align: center;">
+        Brak klastrów. Utwórz pierwszy przez <code>/api/docs/</code>.
       </div>
+      {% endfor %}
 
     </div>
   </div>
@@ -285,5 +244,5 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="{% static 'js/instances.js' %}"></script>
+<script src="{% static 'js/instances.js' %}?v={% now 'U' %}"></script>
 {% endblock %}
