@@ -59,6 +59,14 @@
   ansible.builtin.command: sysctl --system
   changed_when: false
 
+- name: Wait for DNS resolution to become available
+  ansible.builtin.command: "getent hosts pkgs.k8s.io"
+  register: dns_check
+  until: dns_check.rc == 0
+  retries: 10
+  delay: 5
+  changed_when: false
+
 - name: Installing support packages
   ansible.builtin.apt:
     update_cache: yes
@@ -125,6 +133,11 @@
     url: "https://pkgs.k8s.io/core:/stable:/v{{ KUBE_VERSION.split('.')[:2] | join('.') }}/deb/Release.key"
     dest: /etc/apt/keyrings/kubernetes-apt-keyring.asc
     mode: '0644'
+    force: yes
+  register: gpg_download
+  until: gpg_download is success
+  retries: 5
+  delay: 10
 
 - name: Add kube apt repo
   apt_repository:
