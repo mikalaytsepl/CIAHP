@@ -1,3 +1,4 @@
+import json
 import subprocess
 import threading
 from pathlib import Path
@@ -11,8 +12,8 @@ def _get_ansible_dir() -> Path:
 
 
 def _to_extra_vars_str(d: dict) -> str:
-    """Convert a dict to an ansible --extra-vars string."""
-    return " ".join(f"{k}={v}" for k, v in d.items())
+    """Convert a dict to an ansible --extra-vars JSON string."""
+    return json.dumps(d)
 
 
 def run_playbook(playbook: str, extra_vars: dict):

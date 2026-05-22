@@ -30,6 +30,8 @@ from ninja import Router
 from ninja.errors import HttpError
 
 from runner.ansible_runner import run_playbook
+from operations.models import Operation
+from operations.schemas import OperationListOut
 
 from .models import Cluster, Node
 from .schemas import (
@@ -47,6 +49,11 @@ from .schemas import (
     NodeOut,
     SetHaVarsIn,
     TrivyScanIn,
+    LynisAuditIn,
+    NftFwIn,
+    AssociateUserIn,
+    DisassociateUserIn,
+    BootstrapAnsibleIn,
 )
 from .services import add_node, create_cluster, delete_cluster_record, remove_node
 
@@ -114,7 +121,13 @@ def add_node_endpoint(request, cluster_name: str, body: NodeIn):
     if body.role not in ("manager", "worker"):
         raise HttpError(400, "role must be 'manager' or 'worker'.")
     try:
-        node = add_node(cluster=cluster, name=body.name, ip=body.ip, role=body.role)
+        node = add_node(
+            cluster=cluster,
+            name=body.name,
+            ip=body.ip,
+            role=body.role,
+            validate_host=body.validate_host,
+        )
     except ValueError as e:
         raise HttpError(400, str(e))
     return node
@@ -274,6 +287,115 @@ def action_set_ha_vars(request, cluster_name: str, body: SetHaVarsIn):
         status=Operation.Status.SUCCESS,
     )
     return ActionOut(operation_id=str(op.id), message="HA vars written to inventory.")
+
+
+@clusters_router.post(
+    "/{cluster_name}/actions/lynis-audit",
+    response=ActionOut,
+    summary="Run a Lynis security audit on a node",
+)
+def action_lynis_audit(request, cluster_name: str, body: LynisAuditIn):
+    _require_cluster(cluster_name)
+    op = run_playbook(
+        "lynis-audit.yml",
+        {"target_cluster": cluster_name, "target_node": body.target_node},
+    )
+    return ActionOut(operation_id=str(op.id))
+
+
+@clusters_router.post(
+    "/{cluster_name}/actions/nftables-hardening",
+    response=ActionOut,
+    summary="Deploy Calico-Friendly nftables hardening",
+)
+def action_nftables_hardening(request, cluster_name: str, body: NftFwIn):
+    _require_cluster(cluster_name)
+    extra: dict = {"target_cluster": cluster_name}
+    if body.target_node:
+        extra["target_node"] = body.target_node
+    op = run_playbook("nft-fw.yml", extra)
+    return ActionOut(operation_id=str(op.id))
+
+
+@clusters_router.post(
+    "/{cluster_name}/actions/benchmark-performance",
+    response=ActionOut,
+    summary="Run k6 application performance load tests on worker nodes",
+)
+def action_benchmark_performance(request, cluster_name: str):
+    _require_cluster(cluster_name)
+    op = run_playbook(
+        "benchmark_performance.yml",
+        {"target_cluster": cluster_name},
+    )
+    return ActionOut(operation_id=str(op.id))
+
+
+@clusters_router.post(
+    "/{cluster_name}/actions/deploy-test-app",
+    response=ActionOut,
+    summary="Deploy Podinfo benchmark application to the cluster",
+)
+def action_deploy_test_app(request, cluster_name: str):
+    _require_cluster(cluster_name)
+    op = run_playbook(
+        "deploy_test_app.yml",
+        {"target_cluster": cluster_name},
+    )
+    return ActionOut(operation_id=str(op.id))
+
+
+@clusters_router.post(
+    "/{cluster_name}/actions/associate-user",
+    response=ActionOut,
+    summary="Propagate Kubeconfig and associate user access to cluster",
+)
+def action_associate_user(request, cluster_name: str, body: AssociateUserIn):
+    _require_cluster(cluster_name)
+    op = run_playbook(
+        "associate-user.yml",
+        {"target_cluster": cluster_name, "target_user": body.target_user},
+    )
+    return ActionOut(operation_id=str(op.id))
+
+
+@clusters_router.post(
+    "/{cluster_name}/actions/disassociate-user",
+    response=ActionOut,
+    summary="Revoke kubeconfig and disassociate user access from cluster",
+)
+def action_disassociate_user(request, cluster_name: str, body: DisassociateUserIn):
+    _require_cluster(cluster_name)
+    op = run_playbook(
+        "dissasociate-user.yml",
+        {"target_cluster": cluster_name, "target_user": body.target_user},
+    )
+    return ActionOut(operation_id=str(op.id))
+
+
+@clusters_router.get(
+    "/{cluster_name}/operations/",
+    response=List[OperationListOut],
+    summary="List operations for a specific cluster",
+)
+def list_cluster_operations(request, cluster_name: str):
+    _require_cluster(cluster_name)
+    ops = Operation.objects.filter(extra_vars__target_cluster=cluster_name)
+    return list(ops)
+
+
+@clusters_router.post(
+    "/{cluster_name}/actions/bootstrap-ansible",
+    response=ActionOut,
+    summary="Bootstrap the Ansible service account on node(s)",
+)
+def action_bootstrap_ansible(request, cluster_name: str, body: BootstrapAnsibleIn):
+    _require_cluster(cluster_name)
+    extra: dict = {"target_cluster": cluster_name, "initial_user": body.initial_user}
+    if body.target_node:
+        extra["target_node"] = body.target_node
+    op = run_playbook("propagate_ansible.yml", extra)
+    return ActionOut(operation_id=str(op.id))
 
 
 # ── Private helpers ──────────────────────────────────────────────────────────

@@ -3,13 +3,13 @@ import subprocess as sub
 from pathlib import Path
 from enum import Enum
 from typing import Literal
+import platform
+import socket
 
 import string
 from random import choices
 
 import yaml
-
-import re
 
 class HostType(str,Enum):
     MANAGER="manager"
@@ -32,18 +32,23 @@ class InventoryManager():
                 }
             })
 
-    # Help funcitons 
+    # Helper functions 
     @staticmethod
     def _validate_host(ip: str) -> bool:
         # validate if IP has the correct format in the first place
         IP_REGEX = r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$"
-        if not re.match(IP_REGEX,ip):
+        if not re.match(IP_REGEX, ip):
             raise ValueError(f"Invalid IP format: {ip}")
         
-        # check if the host pings
+        # check if the host pings (OS-aware)
         try:
+            if platform.system() == "Windows":
+                ping_cmd = ["ping", "-n", "1", "-w", "3000", ip]
+            else:
+                ping_cmd = ["ping", "-c", "1", "-W", "3", ip]
+            
             result = sub.run(
-                ["ping", "-c", "1", "-W", '3', ip],
+                ping_cmd,
                 stdout=sub.DEVNULL,
                 stderr=sub.DEVNULL,
             )
@@ -52,18 +57,12 @@ class InventoryManager():
         except Exception as e:
             raise ValueError(f"Ping check failed: {e}")
         
-        # check if ssh port is open 
+        # check if ssh port is open using pure Python sockets
         try: 
-            result = sub.run(
-                ["nc", "-z", "-w", str(3), ip, "22"],
-                capture_output=True,
-                text=True,
-            )
-
-            if result.returncode != 0:
-                raise ValueError(f"SSH not reachable on {ip}")
+            with socket.create_connection((ip, 22), timeout=3):
+                pass
         except Exception as e:
-            raise ValueError(f'SSH check failed: {e}')
+            raise ValueError(f"SSH not reachable on {ip}: {e}")
         
         # once all 3 checks pass, host is good to run scripts against
         return True
@@ -79,14 +78,17 @@ class InventoryManager():
 
     # CRUD logic 
 
-    def add_host(self, name: str, ip: str, cluster_name: str, role: Literal["managers", "workers"]):
+    def add_host(self, name: str, ip: str, cluster_name: str, role: Literal["managers", "workers"], validate: bool = False) -> str:
+            if validate:
+                self._validate_host(ip)
+
             inv = self._load()
             
             # ensure global role exists 
             global_role_group = f"global_{role}"
             all_children = inv["all"]["children"]
             
-            # setup chierarchy
+            # setup hierarchy
             cluster_root = all_children["clusters"]["children"].setdefault(cluster_name, {"children": {}})
             role_group_name = f"{cluster_name}_{role}"
             
@@ -99,18 +101,19 @@ class InventoryManager():
             # Add the actual host data
             host_list = cluster_root["children"][role_group_name]["hosts"]
             
-            # generate random suffix to ensure quniqueness
+            # generate random suffix to ensure uniqueness
             suffix = ''.join(choices(string.ascii_lowercase + string.digits, k=5))
             full_name = f'{name}-{suffix}'
             # sanitize name so k8s will accept it as a hostname
-            name = re.sub(r'[^a-z0-9-]', '-', full_name.lower())
-            if name in host_list:
-                print(f"Warning: Host {name} already exists in {role_group_name}. Updating IP.")
+            sanitized_name = re.sub(r'[^a-z0-9-]', '-', full_name.lower())
+            if sanitized_name in host_list:
+                print(f"Warning: Host {sanitized_name} already exists in {role_group_name}. Updating IP.")
             
-            host_list[name] = {"ansible_host": ip}
+            host_list[sanitized_name] = {"ansible_host": ip}
 
             self._save(inv)
-            print(f"Successfully added {name} ({ip}) to {cluster_name} as a {role[:-1]}.")
+            print(f"Successfully added {sanitized_name} ({ip}) to {cluster_name} as a {role[:-1]}.")
+            return sanitized_name
 
     def delete_host(self, name: str, cluster_name: str, role: Literal["managers", "workers"]):
             inv = self._load()
@@ -148,14 +151,14 @@ class InventoryManager():
         except KeyError:
             raise ValueError(f"Cluster '{cluster_name}' not found")
         
-    def truncate_cluster_resources(self,cluster_name:str) -> None:
+    def truncate_cluster_resources(self, cluster_name: str) -> None:
         inv = self._load()
-        cluster_resources = self.get_cluster_resouces(inv,cluster_name)
+        cluster_resources = self.get_cluster_resouces(inv, cluster_name)
         
         # clear out resources of managers and workers hosts
-        cluster_resource_groups = (f"{cluster_name}_managers",f"{cluster_name}_workers")
-        for resoruce_group in cluster_resource_groups:
-            cluster_resources[resoruce_group]['hosts'].clear()
+        cluster_resource_groups = (f"{cluster_name}_managers", f"{cluster_name}_workers")
+        for resource_group in cluster_resource_groups:
+            cluster_resources[resource_group]['hosts'].clear()
         self._save(inv)
     
     def set_cluster_ha_vars(self, cluster_name: str, vip_address: str, endpoint_port: int = 8443) -> None:
