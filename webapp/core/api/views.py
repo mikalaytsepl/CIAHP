@@ -63,6 +63,8 @@ def _nodes_ui_status(nodes: list) -> tuple[str | None, str | None]:
     statuses = {n.status for n in nodes}
     if Node.Status.DEPLOYING in statuses:
         return 'deploying', 'Deploying'
+    if Node.Status.DELETING in statuses:
+        return 'deleting', 'Deleting'
     if Node.Status.ERROR in statuses:
         return 'error', 'Error'
     return 'healthy', 'Healthy'
@@ -74,6 +76,8 @@ def _qs_ui_status(qs) -> tuple[str | None, str | None]:
         return None, None
     if qs.filter(status=Node.Status.DEPLOYING).exists():
         return 'deploying', 'DEPLOYING'
+    if qs.filter(status=Node.Status.DELETING).exists():
+        return 'deleting', 'DELETING'
     if qs.filter(status=Node.Status.ERROR).exists():
         return 'error', 'ERROR'
     return 'healthy', 'HEALTHY'
@@ -129,4 +133,9 @@ def instances(request):
 
 
 def hardening(request):
-    return render(request, 'hardening.html')
+    from clusters.models import Cluster
+    clusters_data = [
+        {'name': cluster.name, 'nodes': list(cluster.nodes.all())}
+        for cluster in Cluster.objects.all()
+    ]
+    return render(request, 'hardening.html', {'clusters': clusters_data})

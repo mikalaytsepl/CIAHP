@@ -1,19 +1,182 @@
 {% extends "base.html" %}
- 
+{% load static %}
+
 {% block extra_styles %}
+<link rel="stylesheet" href="{% static 'css/hardening.css' %}?v={% now 'U' %}">
 {% endblock %}
 
 {% block title %}Ustawienia Utwardzania{% endblock %}
 {% block nav_hardening %}active{% endblock %}
- 
+
 {% block topbar_section %}Hardening{% endblock %}
- 
+
 {% block content %}
-<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:10px;">
-  <span style="font-family:var(--font-headline);font-size:64px;font-weight:700;color:var(--text-subtle);letter-spacing:-0.02em;">TBD</span>
-  <span style="font-size:13px;color:var(--text-subtle);letter-spacing:0.08em;text-transform:uppercase;">To be determined</span>
+
+{% csrf_token %}
+
+<div class="page-header">
+  <h1 class="page-header__title">Utwardzanie i Bezpieczeństwo</h1>
+  <p class="page-header__sub">Uruchamiaj playbooki utwardzające, skany podatności i zarządzaj dostępem do klastra.</p>
 </div>
+
+<!-- ── TARGET BAR ── -->
+<div class="target-bar">
+  <div class="target-field">
+    <label class="form-label" for="hd-cluster">Klaster</label>
+    <select class="form-select" id="hd-cluster">
+      <option value="" disabled selected>Wybierz klaster…</option>
+      {% for c in clusters %}
+      <option value="{{ c.name }}">{{ c.name }}</option>
+      {% empty %}
+      <option disabled>Brak klastrów — utwórz przez API</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="target-field">
+    <label class="form-label" for="hd-node">Węzeł docelowy</label>
+    <select class="form-select" id="hd-node">
+      <option value="">— Cały klaster —</option>
+      {% for c in clusters %}
+        {% for n in c.nodes %}
+        <option value="{{ n.name }}" data-cluster="{{ c.name }}" hidden>{{ n.name }} ({{ n.role }})</option>
+        {% endfor %}
+      {% endfor %}
+    </select>
+    <span class="target-hint" id="hd-node-hint"></span>
+  </div>
+</div>
+
+<div class="hardening-layout">
+
+  <!-- ── LEFT: ACTIONS ── -->
+  <div class="actions-col">
+
+    <!-- Section: System hardening -->
+    <div class="hd-section">
+      <div class="hd-section__title">Utwardzanie systemu</div>
+      <div class="action-grid">
+
+        <div class="action-card">
+          <div class="action-card__head">
+            <span class="action-card__title">Node Hardening</span>
+            <span class="action-card__tag" data-scope="cluster-or-node">Klaster / węzeł</span>
+          </div>
+          <p class="action-card__desc">SSH, jądro, blokowanie kont — pełen zestaw utwardzający (<code>node_hardening.yml</code>).</p>
+          <button class="run-btn" data-endpoint="harden" data-node="optional" data-label="Node Hardening">Uruchom</button>
+        </div>
+
+        <div class="action-card">
+          <div class="action-card__head">
+            <span class="action-card__title">Firewall (nftables)</span>
+            <span class="action-card__tag" data-scope="cluster-or-node">Klaster / węzeł</span>
+          </div>
+          <p class="action-card__desc">Wdraża reguły nftables zgodne z Calico (<code>nft-fw.yml</code>).</p>
+          <button class="run-btn" data-endpoint="nftables-hardening" data-node="optional" data-label="Firewall nftables">Uruchom</button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Section: Scans & audits -->
+    <div class="hd-section">
+      <div class="hd-section__title">Skany i audyty</div>
+      <div class="action-grid">
+
+        <div class="action-card">
+          <div class="action-card__head">
+            <span class="action-card__title">Lynis Audit</span>
+            <span class="action-card__tag" data-scope="node">Wymaga węzła</span>
+          </div>
+          <p class="action-card__desc">Audyt bezpieczeństwa systemu narzędziem Lynis (<code>lynis-audit.yml</code>).</p>
+          <button class="run-btn" data-endpoint="lynis-audit" data-node="required" data-label="Lynis Audit">Uruchom</button>
+        </div>
+
+        <div class="action-card">
+          <div class="action-card__head">
+            <span class="action-card__title">Trivy Scan</span>
+            <span class="action-card__tag" data-scope="node">Wymaga węzła</span>
+          </div>
+          <p class="action-card__desc">Instalacja Trivy i skan podatności (<code>trivy_provisioning.yml</code>).</p>
+          <button class="run-btn" data-endpoint="scan-trivy" data-node="required" data-label="Trivy Scan">Uruchom</button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Section: Access management -->
+    <div class="hd-section">
+      <div class="hd-section__title">Zarządzanie dostępem</div>
+      <div class="action-grid">
+
+        <div class="action-card">
+          <div class="action-card__head">
+            <span class="action-card__title">Użytkownicy SSH</span>
+            <span class="action-card__tag" data-scope="cluster-or-node">Klaster / węzeł</span>
+          </div>
+          <p class="action-card__desc">Wgrywa konta i klucze SSH z pliku <code>users-list.txt</code> (<code>manage_users.yml</code>).</p>
+          <button class="run-btn" data-endpoint="manage-users" data-node="optional" data-label="Użytkownicy SSH">Uruchom</button>
+        </div>
+
+        <div class="action-card">
+          <div class="action-card__head">
+            <span class="action-card__title">Bootstrap Ansible</span>
+            <span class="action-card__tag" data-scope="cluster-or-node">Klaster / węzeł</span>
+          </div>
+          <p class="action-card__desc">Zakłada konto serwisowe <code>ansible</code> (<code>propagate_ansible.yml</code>).</p>
+          <div class="action-card__field">
+            <input class="form-input" type="text" id="hd-initial-user" placeholder="initial_user (domyślnie: root)">
+          </div>
+          <button class="run-btn" data-endpoint="bootstrap-ansible" data-node="optional" data-label="Bootstrap Ansible">Uruchom</button>
+        </div>
+
+        <div class="action-card">
+          <div class="action-card__head">
+            <span class="action-card__title">Przypisz użytkownika</span>
+            <span class="action-card__tag" data-scope="user">Wymaga usera</span>
+          </div>
+          <p class="action-card__desc">Propaguje kubeconfig i nadaje dostęp do klastra (<code>associate-user.yml</code>).</p>
+          <div class="action-card__field">
+            <input class="form-input" type="text" id="hd-assoc-user" placeholder="nazwa użytkownika">
+          </div>
+          <button class="run-btn" data-endpoint="associate-user" data-node="none" data-user="hd-assoc-user" data-label="Przypisanie użytkownika">Uruchom</button>
+        </div>
+
+        <div class="action-card">
+          <div class="action-card__head">
+            <span class="action-card__title">Odbierz dostęp</span>
+            <span class="action-card__tag" data-scope="user">Wymaga usera</span>
+          </div>
+          <p class="action-card__desc">Cofa kubeconfig i odbiera dostęp do klastra (<code>dissasociate-user.yml</code>).</p>
+          <div class="action-card__field">
+            <input class="form-input" type="text" id="hd-disassoc-user" placeholder="nazwa użytkownika">
+          </div>
+          <button class="run-btn run-btn--danger" data-endpoint="disassociate-user" data-node="none" data-user="hd-disassoc-user" data-label="Odebranie dostępu">Uruchom</button>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── RIGHT: RESULT CONSOLE ── -->
+  <div class="result-col">
+    <div class="result-panel">
+      <div class="result-panel__head">
+        <span class="result-panel__title">Wynik operacji</span>
+        <span class="status-badge" id="hd-status" data-status="" hidden></span>
+      </div>
+      <div class="result-panel__meta" id="hd-meta">
+        Wybierz klaster i uruchom akcję — postęp i logi pojawią się tutaj.
+      </div>
+      <pre class="result-console" id="hd-console" hidden></pre>
+    </div>
+  </div>
+
+</div>
+
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="{% static 'js/hardening.js' %}?v={% now 'U' %}"></script>
 {% endblock %}

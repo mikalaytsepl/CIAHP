@@ -99,3 +99,45 @@ def remove_node(cluster: Cluster, node: Node) -> None:
         status=Operation.Status.SUCCESS,
     )
     node.delete()
+
+
+# ── Post-playbook cleanup helpers (run in the runner's worker thread) ──────────
+# These re-fetch objects by name so they are safe to call from a background
+# thread, and they create no Operation rows — the wipe playbook already logged one.
+
+def purge_node_record(cluster_name: str, node_name: str) -> None:
+    """Drop a node from inventory + DB after its wipe playbook succeeded."""
+    try:
+        cluster = Cluster.objects.get(name=cluster_name)
+        node = Node.objects.get(cluster=cluster, name=node_name)
+    except (Cluster.DoesNotExist, Node.DoesNotExist):
+        return
+    ansible_role = "managers" if node.role == "manager" else "workers"
+    try:
+        _get_inventory_manager().delete_host(name=node.name, cluster_name=cluster.name, role=ansible_role)
+    except ValueError:
+        pass
+    node.delete()
+
+
+def purge_cluster_record(cluster_name: str) -> None:
+    """Drop a cluster + all its nodes from inventory + DB after the wipe playbook succeeded."""
+    try:
+        cluster = Cluster.objects.get(name=cluster_name)
+    except Cluster.DoesNotExist:
+        return
+    try:
+        _get_inventory_manager().truncate_cluster_resources(cluster.name)
+    except Exception:
+        pass
+    cluster.delete()
+
+
+def set_node_status(cluster_name: str, node_name: str, status: str) -> None:
+    """Set a single node's status (used to flag failed deletions)."""
+    Node.objects.filter(cluster__name=cluster_name, name=node_name).update(status=status)
+
+
+def set_cluster_nodes_status(cluster_name: str, status: str) -> None:
+    """Set the status of every node in a cluster (used to flag failed deletions)."""
+    Node.objects.filter(cluster__name=cluster_name).update(status=status)

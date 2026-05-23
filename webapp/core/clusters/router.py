@@ -56,7 +56,16 @@ from .schemas import (
     DisassociateUserIn,
     BootstrapAnsibleIn,
 )
-from .services import add_node, create_cluster, delete_cluster_record, remove_node
+from .services import (
+    add_node,
+    create_cluster,
+    delete_cluster_record,
+    remove_node,
+    purge_node_record,
+    purge_cluster_record,
+    set_node_status,
+    set_cluster_nodes_status,
+)
 
 clusters_router = Router(tags=["Clusters"])
 
@@ -225,13 +234,20 @@ def action_add_worker(request, cluster_name: str, body: AddWorkerIn):
 @clusters_router.post(
     "/{cluster_name}/actions/delete-node",
     response=ActionOut,
-    summary="Drain and wipe a single node from the cluster",
+    summary="Drain and wipe a single node, then remove it from inventory & DB",
 )
 def action_delete_node(request, cluster_name: str, body: DeleteNodeIn):
-    _require_cluster(cluster_name)
+    cluster = _require_cluster(cluster_name)
+    node = get_object_or_404(Node, cluster=cluster, name=body.target_node)
+    node.status = Node.Status.DELETING
+    node.save(update_fields=["status"])
+
+    cn, nn = cluster_name, body.target_node
     op = run_playbook(
         "delete_node.yml",
-        {"target_cluster": cluster_name, "target_node": body.target_node},
+        {"target_cluster": cn, "target_node": nn},
+        on_success=lambda: purge_node_record(cn, nn),
+        on_failure=lambda: set_node_status(cn, nn, Node.Status.ERROR),
     )
     return ActionOut(operation_id=str(op.id))
 
@@ -239,11 +255,19 @@ def action_delete_node(request, cluster_name: str, body: DeleteNodeIn):
 @clusters_router.post(
     "/{cluster_name}/actions/delete-cluster",
     response=ActionOut,
-    summary="Wipe all nodes in a cluster (no graceful drain)",
+    summary="Wipe all nodes in a cluster, then remove it from inventory & DB",
 )
 def action_delete_cluster(request, cluster_name: str):
     _require_cluster(cluster_name)
-    op = run_playbook("delete_cluster.yml", {"target_cluster": cluster_name})
+    Node.objects.filter(cluster__name=cluster_name).update(status=Node.Status.DELETING)
+
+    cn = cluster_name
+    op = run_playbook(
+        "delete_cluster.yml",
+        {"target_cluster": cn},
+        on_success=lambda: purge_cluster_record(cn),
+        on_failure=lambda: set_cluster_nodes_status(cn, Node.Status.ERROR),
+    )
     return ActionOut(operation_id=str(op.id))
 
 

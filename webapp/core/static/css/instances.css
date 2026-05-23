@@ -347,6 +347,7 @@
 
 .status-badge[data-status="healthy"]   { background: var(--primary-dim);  color: var(--primary); }
 .status-badge[data-status="deploying"] { background: var(--tertiary-dim); color: var(--tertiary); }
+.status-badge[data-status="deleting"]  { background: var(--red-dim);      color: var(--red); }
 .status-badge[data-status="error"]     { background: var(--red-dim);      color: var(--red); }
 
 /* ── CLUSTER BODY ── */

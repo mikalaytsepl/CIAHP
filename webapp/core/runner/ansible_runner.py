@@ -16,22 +16,30 @@ def _to_extra_vars_str(d: dict) -> str:
     return json.dumps(d)
 
 
-def run_playbook(playbook: str, extra_vars: dict):
+def run_playbook(playbook: str, extra_vars: dict, on_success=None, on_failure=None):
     """
     Spawn an Operation DB record, then run the Ansible playbook in a
     background thread.  Returns the Operation immediately so the caller
     can hand the operation_id back to the HTTP client.
+
+    on_success / on_failure: optional zero-arg callables run in the worker
+    thread after the playbook finishes, depending on its exit status. Use
+    them for post-run bookkeeping (e.g. removing a wiped node from the DB).
     """
     # Import here to avoid circular-import issues at module load time
     from operations.models import Operation
 
     op = Operation.objects.create(playbook=playbook, extra_vars=extra_vars)
-    thread = threading.Thread(target=_execute, args=(op.id, playbook, extra_vars), daemon=True)
+    thread = threading.Thread(
+        target=_execute,
+        args=(op.id, playbook, extra_vars, on_success, on_failure),
+        daemon=True,
+    )
     thread.start()
     return op
 
 
-def _execute(op_id, playbook: str, extra_vars: dict):
+def _execute(op_id, playbook: str, extra_vars: dict, on_success=None, on_failure=None):
     """Background thread: actually runs ansible-playbook and updates the DB."""
     from operations.models import Operation
 
@@ -91,3 +99,13 @@ def _execute(op_id, playbook: str, extra_vars: dict):
             node_obj.save(update_fields=["status"])
         except Exception as e:
             print(f"[runner] Failed to update node {node_id} status: {e}")
+
+    # Run the caller's completion hook (e.g. purge a wiped node/cluster)
+    callback = on_success if op.status == Operation.Status.SUCCESS else on_failure
+    if callback is not None:
+        from django.db import close_old_connections
+        close_old_connections()
+        try:
+            callback()
+        except Exception as e:
+            print(f"[runner] completion callback failed for op {op_id}: {e}")

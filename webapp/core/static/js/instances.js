@@ -149,14 +149,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const cluster = btn.dataset.cluster;
     const node    = btn.dataset.node;
-    if (!confirm(`Usunąć węzeł "${node}" z klastra "${cluster}"?`)) return;
+    if (!confirm(`Usunąć węzeł "${node}" z klastra "${cluster}"?\n\nTo uruchomi playbook: węzeł zostanie wyczyszczony (kubeadm reset) i usunięty z klastra. Operacja działa w tle.`)) return;
 
     btn.disabled = true;
 
     try {
-      const resp = await fetch(`/api/clusters/${cluster}/nodes/${node}/`, {
-        method:  'DELETE',
-        headers: { 'X-CSRFToken': getCsrf() },
+      const resp = await fetch(`/api/clusters/${cluster}/actions/delete-node`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+        body:    JSON.stringify({ target_node: node }),
       });
 
       if (resp.ok) {
@@ -182,17 +183,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const clusterItem = btn.closest('.cluster-item');
     const cluster     = clusterItem.dataset.cluster;
-    if (!confirm(`Usunąć klaster "${cluster}" i wszystkie jego węzły z bazy?\n\nUwaga: nie uruchamia to playbooków — fizyczne węzły pozostają bez zmian.`)) return;
+    if (!confirm(`Usunąć klaster "${cluster}" i wszystkie jego węzły?\n\nTo uruchomi playbook: wszystkie maszyny zostaną wyczyszczone (kubeadm reset), a klaster usunięty z inventory i bazy. Operacja działa w tle.`)) return;
 
     btn.disabled = true;
 
     try {
-      const resp = await fetch(`/api/clusters/${cluster}/`, {
-        method:  'DELETE',
-        headers: { 'X-CSRFToken': getCsrf() },
+      const resp = await fetch(`/api/clusters/${cluster}/actions/delete-cluster`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
       });
 
-      if (resp.ok || resp.status === 204) {
+      if (resp.ok) {
         window.location.href = '/instances/';
       } else {
         const data = await resp.json().catch(() => ({}));

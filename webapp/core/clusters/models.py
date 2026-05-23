@@ -24,6 +24,7 @@ class Node(models.Model):
     class Status(models.TextChoices):
         DEPLOYING = "deploying", "Deploying"
         HEALTHY   = "healthy",   "Healthy"
+        DELETING  = "deleting",  "Deleting"
         ERROR     = "error",     "Error"
 
     cluster    = models.ForeignKey(Cluster, on_delete=models.CASCADE, related_name="nodes")
