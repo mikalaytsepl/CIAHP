@@ -45,9 +45,10 @@ class ClusterListOut(Schema):
 # ── Node schemas ─────────────────────────────────────────────────────────────
 
 class NodeIn(Schema):
-    name: str
-    ip:   str
-    role: str   # "manager" | "worker"
+    name:          str
+    ip:            str
+    role:          str   # "manager" | "worker"
+    validate_host: bool = False
 
 
 class NodeDeployOut(Schema):
@@ -92,6 +93,27 @@ class TrivyScanIn(Schema):
 class SetHaVarsIn(Schema):
     vip_address:    str
     endpoint_port:  int = 8443
+
+
+class LynisAuditIn(Schema):
+    target_node:  str
+
+
+class NftFwIn(Schema):
+    target_node:  Optional[str] = None
+
+
+class AssociateUserIn(Schema):
+    target_user:  str
+
+
+class DisassociateUserIn(Schema):
+    target_user:  str
+
+
+class BootstrapAnsibleIn(Schema):
+    target_node:  Optional[str] = None
+    initial_user: str = "root"
 
 
 # ── Generic action response ──────────────────────────────────────────────────

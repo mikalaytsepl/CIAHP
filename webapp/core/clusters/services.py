@@ -62,18 +62,18 @@ def delete_cluster_record(cluster: Cluster) -> None:
 
 # ── Node helpers ─────────────────────────────────────────────────────────────
 
-def add_node(cluster: Cluster, name: str, ip: str, role: str) -> Node:
+def add_node(cluster: Cluster, name: str, ip: str, role: str, validate_host: bool = False) -> Node:
     """
     Add a node to the Ansible inventory (with validation) and persist to DB.
     role must be 'manager' or 'worker'.
     """
     ansible_role = "managers" if role == "manager" else "workers"
     mgr = _get_inventory_manager()
-    inventory_name = mgr.add_host(name=name, ip=ip, cluster_name=cluster.name, role=ansible_role)
+    final_name = mgr.add_host(name=name, ip=ip, cluster_name=cluster.name, role=ansible_role, validate=validate_host)
 
     node = Node.objects.create(
         cluster=cluster,
-        name=inventory_name,  # use the suffixed name that inventory actually stored
+        name=final_name,
         ip=ip,
         role=role,
     )
