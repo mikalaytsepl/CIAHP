@@ -156,6 +156,43 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', () => runAction(btn));
   });
 
+  /* ── USER DROPDOWNS (associate / disassociate) ── */
+  const USER_MANUAL = '__manual__';
+
+  async function loadUserSelects() {
+    const selects = document.querySelectorAll('.ul-user-select');
+    if (!selects.length) return;
+
+    let users = [];
+    try {
+      const r = await fetch('/api/users-list/');
+      if (r.ok) users = await r.json();
+    } catch (e) { /* offline → manual entry still works */ }
+
+    selects.forEach(sel => {
+      const manualOpt = sel.querySelector(`option[value="${USER_MANUAL}"]`);
+      users.forEach(u => {
+        const o = document.createElement('option');
+        o.value = u.name;
+        o.textContent = u.name + (u.is_admin ? ' (admin)' : '');
+        sel.insertBefore(o, manualOpt);
+      });
+
+      const input = document.getElementById(sel.dataset.target);
+      sel.addEventListener('change', () => {
+        if (sel.value === USER_MANUAL) {
+          input.hidden = false;
+          input.value = '';
+          input.focus();
+        } else {
+          input.hidden = true;        // preset chosen → feed hidden field that runAction reads
+          input.value = sel.value;
+        }
+      });
+    });
+  }
+  loadUserSelects();
+
   /* ══════════════════════════════════════════════════════════════════════
      USERS-LIST EDITOR (users-list.txt)
      ══════════════════════════════════════════════════════════════════════ */

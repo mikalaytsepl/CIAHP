@@ -126,7 +126,11 @@
           <p class="action-card__desc">Propaguje kubeconfig i nadaje dostęp do klastra (<code>associate-user.yml</code>).</p>
           <p class="action-card__note">Wymaga istniejącego konta systemowego — najpierw uruchom <strong>„Użytkownicy SSH"</strong> (inaczej błąd <code>chown</code>).</p>
           <div class="action-card__field">
-            <input class="form-input" type="text" id="hd-assoc-user" placeholder="nazwa użytkownika">
+            <select class="form-select ul-user-select" data-target="hd-assoc-user">
+              <option value="" disabled selected>Wybierz użytkownika…</option>
+              <option value="__manual__">— inny (wpisz ręcznie) —</option>
+            </select>
+            <input class="form-input ul-user-manual" type="text" id="hd-assoc-user" placeholder="nazwa użytkownika" hidden>
           </div>
           <button class="run-btn" data-endpoint="associate-user" data-node="none" data-user="hd-assoc-user" data-label="Przypisanie użytkownika">Uruchom</button>
         </div>
@@ -138,7 +142,11 @@
           </div>
           <p class="action-card__desc">Cofa kubeconfig i odbiera dostęp do klastra (<code>dissasociate-user.yml</code>).</p>
           <div class="action-card__field">
-            <input class="form-input" type="text" id="hd-disassoc-user" placeholder="nazwa użytkownika">
+            <select class="form-select ul-user-select" data-target="hd-disassoc-user">
+              <option value="" disabled selected>Wybierz użytkownika…</option>
+              <option value="__manual__">— inny (wpisz ręcznie) —</option>
+            </select>
+            <input class="form-input ul-user-manual" type="text" id="hd-disassoc-user" placeholder="nazwa użytkownika" hidden>
           </div>
           <button class="run-btn run-btn--danger" data-endpoint="disassociate-user" data-node="none" data-user="hd-disassoc-user" data-label="Odebranie dostępu">Uruchom</button>
         </div>

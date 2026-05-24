@@ -169,7 +169,9 @@
 }
 
 .action-card__field { margin-top: 2px; }
-.action-card__field .form-input { font-size: 12.5px; padding: 8px 12px; }
+.action-card__field .form-input  { font-size: 12.5px; padding: 8px 12px; }
+.action-card__field .form-select { font-size: 12.5px; padding: 8px 32px 8px 12px; }
+.action-card__field .ul-user-manual { margin-top: 8px; }
 
 .action-card__note {
   font-size: 11px;
