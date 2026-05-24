@@ -1,5 +1,7 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login
+from django.contrib.auth.decorators import login_required
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from clusters.models import Node
 from operations.models import Operation
@@ -86,17 +88,29 @@ def _qs_ui_status(qs) -> tuple[str | None, str | None]:
 # ── Views ─────────────────────────────────────────────────────────────────────
 
 def login_view(request):
+    next_url = request.POST.get('next') or request.GET.get('next') or ''
+
+    def _safe_redirect():
+        if next_url and url_has_allowed_host_and_scheme(
+            next_url,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        ):
+            return redirect(next_url)
+        return redirect('dashboard')
+
     if request.method == 'POST':
         username = request.POST.get('username', '')
         password = request.POST.get('password', '')
         user = authenticate(request, username=username, password=password)
         if user is not None:
             login(request, user)
-            return redirect('dashboard')
-        return render(request, 'login.html', {'error': 'Nieprawidłowy login lub hasło.'})
-    return render(request, 'login.html')
+            return _safe_redirect()
+        return render(request, 'login.html', {'error': 'Nieprawidłowy login lub hasło.', 'next': next_url})
+    return render(request, 'login.html', {'next': next_url})
 
 
+@login_required
 def dashboard(request):
     all_nodes    = Node.objects.all()
     manager_qs   = Node.objects.filter(role=Node.Role.MANAGER)
@@ -113,6 +127,7 @@ def dashboard(request):
     })
 
 
+@login_required
 def instances(request):
     from clusters.models import Cluster
     clusters_data = []
@@ -132,6 +147,7 @@ def instances(request):
     return render(request, 'instances.html', {'clusters': clusters_data})
 
 
+@login_required
 def hardening(request):
     from clusters.models import Cluster
     clusters_data = [

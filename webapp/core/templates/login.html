@@ -20,6 +20,7 @@
 
     <form class="login-form" method="post">
       {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
       <div class="login-field">
         <label class="login-label" for="username">Użytkownik</label>
         <input class="login-input" type="text" id="username" name="username" placeholder="User Name" autocomplete="username">
@@ -31,11 +32,7 @@
       <button class="login-btn" type="submit">Zaloguj</button>
     </form>
 
-    <a href="#" class="login-forgot">Zapomniałeś hasła?</a>
-
   </div>
-
-  <footer class="login-footer">© TBD</footer>
 
 </body>
 </html>
