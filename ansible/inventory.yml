@@ -24,3 +24,8 @@ all:
                     vars:
                         cluster_vip: 192.168.100.100
                         control_plane_endpoint: 192.168.100.100:8443
+                testcluster:
+                    children: {}
+                    vars:
+                        cluster_vip: 192.168.0.0
+                        control_plane_endpoint: 192.168.0.0:8443

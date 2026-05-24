@@ -171,6 +171,140 @@
 .action-card__field { margin-top: 2px; }
 .action-card__field .form-input { font-size: 12.5px; padding: 8px 12px; }
 
+.action-card__note {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--tertiary);
+  background: var(--tertiary-dim);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.action-card__note code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+}
+
+/* ── USERS-LIST EDITOR ── */
+.userlist-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+}
+
+.userlist-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-bottom: 14px;
+}
+.userlist-hint code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: var(--text);
+  background: var(--surface3);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.userlist-table-wrap { overflow-x: auto; }
+
+.userlist-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.userlist-table th {
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.userlist-table .ul-admin-col { width: 70px; text-align: center; }
+.userlist-table .ul-rm-col    { width: 40px; }
+
+.userlist-table td {
+  padding: 6px 8px;
+  vertical-align: middle;
+}
+
+.userlist-table td.ul-admin-cell { text-align: center; }
+
+.userlist-table .form-input { font-size: 12.5px; padding: 8px 10px; }
+
+.userlist-table input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.ul-rm {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  transition: color 0.15s, border-color 0.15s;
+}
+.ul-rm:hover { color: var(--red); border-color: var(--red); }
+
+.userlist-empty {
+  font-size: 12px;
+  color: var(--text-subtle);
+  padding: 14px 8px;
+  text-align: center;
+}
+
+.userlist-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.ul-btn {
+  padding: 9px 16px;
+  border-radius: 6px;
+  font-family: var(--font-headline);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+
+.ul-btn--ghost {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+.ul-btn--ghost:hover { border-color: var(--border-active); color: var(--text); }
+
+.ul-btn--primary {
+  background: var(--primary);
+  border: 1px solid var(--primary);
+  color: #fff;
+}
+.ul-btn--primary:hover { background: var(--primary-dark); }
+.ul-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.ul-status { font-size: 12px; color: var(--text-muted); }
+.ul-status[data-kind="ok"]  { color: var(--primary); }
+.ul-status[data-kind="err"] { color: var(--red); }
+
 /* ── RUN BUTTON ── */
 .run-btn {
   margin-top: auto;

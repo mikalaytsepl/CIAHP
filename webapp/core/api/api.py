@@ -3,6 +3,7 @@ from ninja import NinjaAPI
 from clusters.router import clusters_router
 from operations.router import operations_router
 from inventory.router import inventory_router
+from api.users_list import users_list_router
 
 api = NinjaAPI(
     title="CIAHP API",
@@ -16,6 +17,7 @@ api = NinjaAPI(
 api.add_router("/clusters/",   clusters_router)
 api.add_router("/operations/", operations_router)
 api.add_router("/inventory/",  inventory_router)
+api.add_router("/users-list/", users_list_router)
 
 
 @api.get("/health", tags=["Health"], summary="Health check")

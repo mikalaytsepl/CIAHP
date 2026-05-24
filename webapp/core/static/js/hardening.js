@@ -127,12 +127,6 @@ document.addEventListener('DOMContentLoaded', () => {
       body.target_user = user;
     }
 
-    if (endpoint === 'bootstrap-ansible') {
-      const initialEl = document.getElementById('hd-initial-user');
-      const initial = (initialEl.value || '').trim();
-      if (initial) body.initial_user = initial;
-    }
-
     btn.disabled = true;
     const orig = btn.textContent;
     btn.textContent = 'Wysyłanie…';
@@ -161,5 +155,128 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.run-btn').forEach(btn => {
     btn.addEventListener('click', () => runAction(btn));
   });
+
+  /* ══════════════════════════════════════════════════════════════════════
+     USERS-LIST EDITOR (users-list.txt)
+     ══════════════════════════════════════════════════════════════════════ */
+  const ulRows   = document.getElementById('ul-rows');
+  const ulEmpty  = document.getElementById('ul-empty');
+  const ulAdd    = document.getElementById('ul-add');
+  const ulSave   = document.getElementById('ul-save');
+  const ulStatus = document.getElementById('ul-status');
+
+  function ulSetStatus(text, kind) {
+    ulStatus.textContent = text || '';
+    if (kind) ulStatus.dataset.kind = kind; else delete ulStatus.dataset.kind;
+  }
+
+  function ulRefreshEmpty() {
+    ulEmpty.hidden = ulRows.children.length > 0;
+  }
+
+  function ulAddRow(user) {
+    const u = user || { name: '', key_path: '', is_admin: false };
+    const tr = document.createElement('tr');
+
+    const tdName = document.createElement('td');
+    const nameInput = document.createElement('input');
+    nameInput.className = 'form-input ul-name';
+    nameInput.type = 'text';
+    nameInput.placeholder = 'np. admin_tester';
+    nameInput.value = u.name;
+    tdName.appendChild(nameInput);
+
+    const tdKey = document.createElement('td');
+    const keyInput = document.createElement('input');
+    keyInput.className = 'form-input ul-key';
+    keyInput.type = 'text';
+    keyInput.placeholder = '~/.ssh/id_ed25519.pub';
+    keyInput.value = u.key_path;
+    tdKey.appendChild(keyInput);
+
+    const tdAdmin = document.createElement('td');
+    tdAdmin.className = 'ul-admin-cell';
+    const adminInput = document.createElement('input');
+    adminInput.type = 'checkbox';
+    adminInput.className = 'ul-admin';
+    adminInput.checked = !!u.is_admin;
+    tdAdmin.appendChild(adminInput);
+
+    const tdRm = document.createElement('td');
+    const rmBtn = document.createElement('button');
+    rmBtn.type = 'button';
+    rmBtn.className = 'ul-rm';
+    rmBtn.title = 'Usuń wiersz';
+    rmBtn.textContent = '×';
+    rmBtn.addEventListener('click', () => { tr.remove(); ulRefreshEmpty(); });
+    tdRm.appendChild(rmBtn);
+
+    tr.append(tdName, tdKey, tdAdmin, tdRm);
+    ulRows.appendChild(tr);
+    ulRefreshEmpty();
+  }
+
+  function ulCollect() {
+    const users = [];
+    ulRows.querySelectorAll('tr').forEach(tr => {
+      const name = tr.querySelector('.ul-name').value.trim();
+      const key  = tr.querySelector('.ul-key').value.trim();
+      const adm  = tr.querySelector('.ul-admin').checked;
+      if (name || key) users.push({ name, key_path: key, is_admin: adm });
+    });
+    return users;
+  }
+
+  async function ulLoad() {
+    try {
+      const r = await fetch('/api/users-list/');
+      if (!r.ok) { ulSetStatus(`Błąd wczytania (${r.status})`, 'err'); return; }
+      const users = await r.json();
+      ulRows.innerHTML = '';
+      users.forEach(ulAddRow);
+      ulRefreshEmpty();
+      ulSetStatus(users.length ? `Wczytano ${users.length} użytkownik(ów).` : 'Plik pusty lub nie istnieje.', null);
+    } catch (e) {
+      ulSetStatus(`Błąd połączenia: ${e.message}`, 'err');
+    }
+  }
+
+  async function ulSaveList() {
+    const users = ulCollect();
+    // client-side validation mirroring the backend
+    const seen = new Set();
+    for (const u of users) {
+      if (!u.name || !u.key_path) { ulSetStatus('Każdy wiersz musi mieć nazwę i ścieżkę klucza.', 'err'); return; }
+      if (u.name.includes(',') || u.key_path.includes(',')) { ulSetStatus('Nazwa/ścieżka nie mogą zawierać przecinka.', 'err'); return; }
+      if (seen.has(u.name)) { ulSetStatus(`Zduplikowana nazwa: ${u.name}`, 'err'); return; }
+      seen.add(u.name);
+    }
+
+    ulSave.disabled = true;
+    ulSetStatus('Zapisywanie…', null);
+    try {
+      const r = await fetch('/api/users-list/', {
+        method:  'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+        body:    JSON.stringify({ users }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (r.ok) {
+        ulSetStatus(`Zapisano ${Array.isArray(data) ? data.length : users.length} użytkownik(ów).`, 'ok');
+      } else {
+        ulSetStatus(`Błąd zapisu (${r.status}): ${data.detail || r.statusText}`, 'err');
+      }
+    } catch (e) {
+      ulSetStatus(`Błąd połączenia: ${e.message}`, 'err');
+    } finally {
+      ulSave.disabled = false;
+    }
+  }
+
+  if (ulRows) {
+    ulAdd.addEventListener('click', () => ulAddRow());
+    ulSave.addEventListener('click', ulSaveList);
+    ulLoad();
+  }
 
 });

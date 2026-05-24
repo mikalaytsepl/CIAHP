@@ -120,22 +120,11 @@
 
         <div class="action-card">
           <div class="action-card__head">
-            <span class="action-card__title">Bootstrap Ansible</span>
-            <span class="action-card__tag" data-scope="cluster-or-node">Klaster / węzeł</span>
-          </div>
-          <p class="action-card__desc">Zakłada konto serwisowe <code>ansible</code> (<code>propagate_ansible.yml</code>).</p>
-          <div class="action-card__field">
-            <input class="form-input" type="text" id="hd-initial-user" placeholder="initial_user (domyślnie: root)">
-          </div>
-          <button class="run-btn" data-endpoint="bootstrap-ansible" data-node="optional" data-label="Bootstrap Ansible">Uruchom</button>
-        </div>
-
-        <div class="action-card">
-          <div class="action-card__head">
             <span class="action-card__title">Przypisz użytkownika</span>
             <span class="action-card__tag" data-scope="user">Wymaga usera</span>
           </div>
           <p class="action-card__desc">Propaguje kubeconfig i nadaje dostęp do klastra (<code>associate-user.yml</code>).</p>
+          <p class="action-card__note">Wymaga istniejącego konta systemowego — najpierw uruchom <strong>„Użytkownicy SSH"</strong> (inaczej błąd <code>chown</code>).</p>
           <div class="action-card__field">
             <input class="form-input" type="text" id="hd-assoc-user" placeholder="nazwa użytkownika">
           </div>
@@ -154,6 +143,39 @@
           <button class="run-btn run-btn--danger" data-endpoint="disassociate-user" data-node="none" data-user="hd-disassoc-user" data-label="Odebranie dostępu">Uruchom</button>
         </div>
 
+      </div>
+    </div>
+
+    <!-- Section: users-list.txt editor -->
+    <div class="hd-section">
+      <div class="hd-section__title">Lista użytkowników SSH (users-list.txt)</div>
+      <div class="userlist-panel">
+        <p class="userlist-hint">
+          Konta zakładane przez akcję <strong>„Użytkownicy SSH"</strong>. Ścieżka do klucza
+          <code>.pub</code> musi istnieć na kontrolerze Ansible. Zapis nadpisuje cały plik.
+        </p>
+
+        <div class="userlist-table-wrap">
+          <table class="userlist-table">
+            <thead>
+              <tr>
+                <th>Nazwa</th>
+                <th>Ścieżka klucza (.pub)</th>
+                <th class="ul-admin-col">Admin</th>
+                <th class="ul-rm-col"></th>
+              </tr>
+            </thead>
+            <tbody id="ul-rows"></tbody>
+          </table>
+        </div>
+
+        <div class="userlist-empty" id="ul-empty" hidden>Brak użytkowników — dodaj wiersz.</div>
+
+        <div class="userlist-actions">
+          <button type="button" class="ul-btn ul-btn--ghost" id="ul-add">+ Dodaj wiersz</button>
+          <button type="button" class="ul-btn ul-btn--primary" id="ul-save">Zapisz listę</button>
+          <span class="ul-status" id="ul-status"></span>
+        </div>
       </div>
     </div>
 
