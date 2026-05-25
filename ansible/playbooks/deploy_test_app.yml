@@ -1,0 +1,22 @@
+---
+- name: Deploy Benchmark Application (Podinfo)
+  hosts: "{{ target_cluster }}_managers[0]"
+  become: true
+
+  tasks:
+    - name: Copy Podinfo manifest to manager
+      ansible.builtin.copy:
+        src: ../../kubernetes/podinfo.yaml
+        dest: /tmp/podinfo.yml
+
+    - name: Apply Podinfo to the cluster
+      kubernetes.core.k8s:
+        kubeconfig: /etc/kubernetes/admin.conf
+        state: present
+        src: /tmp/podinfo.yml
+
+    - name: Wait for Podinfo pods to become ready
+      ansible.builtin.command: >
+        kubectl wait --for=condition=ready pod -l app=podinfo --timeout=60s
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf

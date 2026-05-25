@@ -208,3 +208,7 @@ __marimo__/
 
 # Other stuff
 users-list.txt
+
+# Ansible scan/audit artifacts (Lynis .dat, Trivy .json)
+ansible/playbooks/audit/
+
