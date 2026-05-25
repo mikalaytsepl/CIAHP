@@ -19,7 +19,7 @@ all:
                     children:
                         k8s-cluster_managers:
                             hosts:
-                                manager-xphrl:
+                                man1-g1jr3:
                                     ansible_host: 192.168.100.12
                     vars:
                         cluster_vip: 192.168.100.100

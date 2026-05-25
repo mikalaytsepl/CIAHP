@@ -15,6 +15,8 @@ _TITLE_MAP = {
     'deploy_worker':            'Dodano workera',
     'node_hardening':           'Utwardzono węzeł',
     'delete_node':              'Usunięto węzeł',
+    'wipe_node':                'Usunięto węzeł',
+    'provision_access':         'Nadano dostęp do węzła',
     'delete_cluster':           'Usunięto klaster',
     'manage_users':             'Zarządzano użytkownikami',
     'trivy_provisioning':       'Skan Trivy',
@@ -31,7 +33,15 @@ def _op_to_activity(op):
     elif op.status == Operation.Status.FAILED:
         ui_status, badge = 'error', 'ERROR'
     else:
-        ui_status, badge = 'deploying', 'DEPLOYING'
+        # In-progress: label (and colour) by operation type so a running delete
+        # doesn't read "DEPLOYING".
+        pb = op.playbook.lower()
+        if any(w in pb for w in ('delete', 'wipe', 'remove')):
+            ui_status, badge = 'deleting', 'DELETING'
+        elif any(w in pb for w in ('deploy', 'worker', 'manager', 'add')):
+            ui_status, badge = 'deploying', 'DEPLOYING'
+        else:
+            ui_status, badge = 'deploying', 'RUNNING'
 
     playbook_key = op.playbook.replace('.yml', '')
     title = _TITLE_MAP.get(playbook_key, playbook_key.replace('_', ' ').title())

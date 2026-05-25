@@ -118,6 +118,33 @@ document.addEventListener('DOMContentLoaded', () => {
       role: roleInput.value,
     };
 
+    // Optional: provision a login account on the node after deploy.
+    const accessUser = document.getElementById('inst-user').value.trim();
+    if (accessUser) {
+      const method = authInput.value;            // 'password' | 'key'
+      body.access_user = accessUser;
+      body.auth_method = method;
+      if (method === 'key') {
+        const pubkey = document.getElementById('inst-pubkey').value.trim();
+        if (!pubkey) {
+          formError.textContent = 'Metoda „Klucz" wymaga klucza publicznego.';
+          formError.style.display = 'block';
+          submitBtn.disabled = false; submitBtn.innerHTML = origBtnHTML;
+          return;
+        }
+        body.public_key = pubkey;
+      } else {
+        const pass = document.getElementById('inst-pass').value;
+        if (!pass) {
+          formError.textContent = 'Metoda „Hasło" wymaga hasła.';
+          formError.style.display = 'block';
+          submitBtn.disabled = false; submitBtn.innerHTML = origBtnHTML;
+          return;
+        }
+        body.access_password = pass;
+      }
+    }
+
     try {
       const resp = await fetch(`/api/clusters/${cluster}/nodes/`, {
         method:  'POST',

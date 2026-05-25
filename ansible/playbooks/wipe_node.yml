@@ -1,0 +1,8 @@
+---
+- name: Force-wipe a single node (no drain)
+  hosts: "{{ target_node }}"
+  become: true
+
+  tasks:
+    - name: Execute node cleanup
+      ansible.builtin.import_tasks: ../tasks/cleanup_node.yml

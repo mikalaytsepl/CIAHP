@@ -65,13 +65,20 @@
           </select>
         </div>
 
+        <!-- Access user (shared for both methods) -->
+        <div class="form-field">
+          <label class="form-label" for="inst-user">Użytkownik dostępowy (konto admin na węźle)</label>
+          <input class="form-input" type="text" id="inst-user" name="username" placeholder="np. devops" autocomplete="off">
+          <span class="field-hint">Opcjonalne — konto zakładane po wdrożeniu, do logowania SSH na ten węzeł (z sudo).</span>
+        </div>
+
         <!-- Authentication method -->
         <div class="form-field">
           <label class="form-label">Metoda Uwierzytelniania</label>
           <div class="auth-methods">
             <div class="auth-card active" data-method="password">
-              <span class="auth-card__title">Login / Hasło</span>
-              <span class="auth-card__sub">Poświadczenia standardowe</span>
+              <span class="auth-card__title">Hasło</span>
+              <span class="auth-card__sub">Logowanie hasłem</span>
             </div>
             <div class="auth-card" data-method="key">
               <span class="auth-card__title">Klucz Publiczny</span>
@@ -81,17 +88,11 @@
           <input type="hidden" id="auth-method-value" name="auth_method" value="password">
         </div>
 
-        <!-- Fields: Login / Password -->
+        <!-- Fields: Password -->
         <div class="auth-fields visible" id="auth-password">
-          <div class="form-row">
-            <div class="form-field" style="margin-bottom:0;">
-              <label class="form-label" for="inst-user">Użytkownik</label>
-              <input class="form-input" type="text" id="inst-user" name="username" placeholder="root">
-            </div>
-            <div class="form-field" style="margin-bottom:0;">
-              <label class="form-label" for="inst-pass">Hasło</label>
-              <input class="form-input" type="password" id="inst-pass" name="password" placeholder="••••••••">
-            </div>
+          <div class="form-field" style="margin-bottom:0;">
+            <label class="form-label" for="inst-pass">Hasło</label>
+            <input class="form-input" type="password" id="inst-pass" name="password" placeholder="••••••••" autocomplete="new-password">
           </div>
         </div>
 

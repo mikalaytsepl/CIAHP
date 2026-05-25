@@ -16,7 +16,7 @@ def _to_extra_vars_str(d: dict) -> str:
     return json.dumps(d)
 
 
-def run_playbook(playbook: str, extra_vars: dict, on_success=None, on_failure=None):
+def run_playbook(playbook: str, extra_vars: dict, on_success=None, on_failure=None, env=None):
     """
     Spawn an Operation DB record, then run the Ansible playbook in a
     background thread.  Returns the Operation immediately so the caller
@@ -25,6 +25,10 @@ def run_playbook(playbook: str, extra_vars: dict, on_success=None, on_failure=No
     on_success / on_failure: optional zero-arg callables run in the worker
     thread after the playbook finishes, depending on its exit status. Use
     them for post-run bookkeeping (e.g. removing a wiped node from the DB).
+
+    env: optional dict merged into the ansible-playbook process environment.
+    Use it for secrets (e.g. a one-shot password) that must NOT appear in
+    --extra-vars, since extra_vars is persisted in the Operation record.
     """
     # Import here to avoid circular-import issues at module load time
     from operations.models import Operation
@@ -32,14 +36,14 @@ def run_playbook(playbook: str, extra_vars: dict, on_success=None, on_failure=No
     op = Operation.objects.create(playbook=playbook, extra_vars=extra_vars)
     thread = threading.Thread(
         target=_execute,
-        args=(op.id, playbook, extra_vars, on_success, on_failure),
+        args=(op.id, playbook, extra_vars, on_success, on_failure, env),
         daemon=True,
     )
     thread.start()
     return op
 
 
-def _execute(op_id, playbook: str, extra_vars: dict, on_success=None, on_failure=None):
+def _execute(op_id, playbook: str, extra_vars: dict, on_success=None, on_failure=None, env=None):
     """Background thread: actually runs ansible-playbook and updates the DB."""
     from operations.models import Operation
 
@@ -64,12 +68,18 @@ def _execute(op_id, playbook: str, extra_vars: dict, on_success=None, on_failure
     if ansible_vars:
         cmd += ["--extra-vars", _to_extra_vars_str(ansible_vars)]
 
+    run_env = None
+    if env:
+        import os
+        run_env = {**os.environ, **env}
+
     try:
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             cwd=str(ansible_dir),
+            env=run_env,
         )
         op.stdout = result.stdout
         op.stderr = result.stderr

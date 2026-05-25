@@ -130,6 +130,11 @@ def add_node_endpoint(request, cluster_name: str, body: NodeIn):
     cluster = get_object_or_404(Cluster, name=cluster_name)
     if body.role not in ("manager", "worker"):
         raise HttpError(400, "role must be 'manager' or 'worker'.")
+
+    # Validate the optional access bundle BEFORE creating anything, so a bad
+    # request doesn't leave an orphaned node behind.
+    _validate_access(body)
+
     try:
         node = add_node(
             cluster=cluster,
@@ -141,6 +146,9 @@ def add_node_endpoint(request, cluster_name: str, body: NodeIn):
     except ValueError as e:
         raise HttpError(400, str(e))
 
+    # After a successful deploy, optionally provision the operator's login account.
+    on_success = _make_access_provision(node.name, body) if body.access_user else None
+
     # Trigger the appropriate playbook immediately after registering the node
     if node.role == "manager":
         existing_managers = cluster.nodes.filter(role="manager").exclude(id=node.id).count()
@@ -150,25 +158,60 @@ def add_node_endpoint(request, cluster_name: str, body: NodeIn):
                 "cluster_cidr":   cluster.cluster_cidr,
                 "kube_version":   cluster.kube_version,
                 "node_id":        node.id,
-            })
+            }, on_success=on_success)
         else:
             op = run_playbook("deploy_additional_manager.yml", {
                 "target_cluster": cluster_name,
                 "target_node":    node.name,
                 "node_id":        node.id,
-            })
+            }, on_success=on_success)
     else:
         op = run_playbook("deploy_worker.yml", {
             "target_cluster": cluster_name,
             "target_node":    node.name,
             "node_id":        node.id,
-        })
+        }, on_success=on_success)
 
     return NodeDeployOut(
         id=node.id, name=node.name, ip=node.ip,
         role=node.role, created_at=node.created_at,
         operation_id=str(op.id),
     )
+
+
+def _validate_access(body: NodeIn) -> None:
+    """Validate the optional access-provisioning bundle. Raises HttpError(400) if invalid."""
+    if not (body.access_user and body.access_user.strip()):
+        return  # provisioning is optional — nothing to validate
+    if body.auth_method not in ("password", "key"):
+        raise HttpError(400, "auth_method musi być 'password' albo 'key'.")
+    if body.auth_method == "key" and not (body.public_key and body.public_key.strip()):
+        raise HttpError(400, "Metoda 'key' wymaga klucza publicznego.")
+    if body.auth_method == "password" and not body.access_password:
+        raise HttpError(400, "Metoda 'password' wymaga hasła.")
+
+
+def _make_access_provision(node_name: str, body: NodeIn):
+    """Build an on_success callback that provisions the operator's login account.
+
+    The password (if any) is passed via an environment variable so it never
+    lands in --extra-vars (which is persisted in the Operation record).
+    """
+    user = body.access_user.strip()
+    method = body.auth_method
+    pubkey = (body.public_key or "").strip()
+    password = body.access_password or ""
+
+    def _provision():
+        extra = {"target_node": node_name, "access_user": user, "auth_method": method}
+        env = None
+        if method == "key":
+            extra["public_key"] = pubkey
+        else:
+            env = {"CIAHP_ACCESS_PW": password}
+        run_playbook("provision_access.yml", extra, env=env)
+
+    return _provision
 
 
 @clusters_router.delete(
@@ -239,12 +282,30 @@ def action_add_worker(request, cluster_name: str, body: AddWorkerIn):
 def action_delete_node(request, cluster_name: str, body: DeleteNodeIn):
     cluster = _require_cluster(cluster_name)
     node = get_object_or_404(Node, cluster=cluster, name=body.target_node)
+
+    # delete_node.yml drains the target from *another* manager, so it cannot
+    # remove the last remaining manager. Pick the right playbook:
+    other_managers = cluster.nodes.filter(role="manager").exclude(id=node.id).count()
+    other_nodes    = cluster.nodes.exclude(id=node.id).count()
+
+    if node.role == "manager" and other_managers == 0:
+        if other_nodes > 0:
+            raise HttpError(
+                400,
+                "Nie można usunąć ostatniego managera, dopóki w klastrze są inne węzły. "
+                "Usuń najpierw workery albo użyj „Usuń klaster\".",
+            )
+        # Only node in the cluster — force-wipe it directly (no drain possible/needed).
+        playbook = "wipe_node.yml"
+    else:
+        playbook = "delete_node.yml"
+
     node.status = Node.Status.DELETING
     node.save(update_fields=["status"])
 
     cn, nn = cluster_name, body.target_node
     op = run_playbook(
-        "delete_node.yml",
+        playbook,
         {"target_cluster": cn, "target_node": nn},
         on_success=lambda: purge_node_record(cn, nn),
         on_failure=lambda: set_node_status(cn, nn, Node.Status.ERROR),

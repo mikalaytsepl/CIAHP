@@ -90,6 +90,13 @@
   letter-spacing: 0.02em;
 }
 
+.field-hint {
+  font-size: 10.5px;
+  color: var(--text-subtle);
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+}
+
 .form-textarea {
   resize: vertical;
   min-height: 90px;

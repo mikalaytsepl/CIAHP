@@ -49,6 +49,11 @@ class NodeIn(Schema):
     ip:            str
     role:          str   # "manager" | "worker"
     validate_host: bool = False
+    # Optional: provision a human admin login on the node after a successful deploy.
+    access_user:     Optional[str] = None
+    auth_method:     Optional[str] = None   # "password" | "key"
+    access_password: Optional[str] = None   # used when auth_method == "password"
+    public_key:      Optional[str] = None   # used when auth_method == "key"
 
 
 class NodeDeployOut(Schema):
