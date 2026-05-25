@@ -7,11 +7,7 @@ from operations.router import operations_router
 from inventory.router import inventory_router
 from api.users_list import users_list_router
 
-# django_auth = authenticated Django session. Browser fetch() calls carry the
-# session cookie + X-CSRFToken header (already sent by the frontend JS), so the
-# UI keeps working; unauthenticated callers get 401.
-# docs_decorator also gates the Swagger UI (/api/docs) and the OpenAPI schema
-# (/api/openapi.json) behind login — otherwise the schema is world-readable.
+
 api = NinjaAPI(
     title="CIAHP API",
     version="1.0",
