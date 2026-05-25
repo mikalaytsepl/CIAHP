@@ -1,0 +1,71 @@
+---
+- name: Setup monitoring agent for nodes 
+  hosts: "{{ target_cluster }}:!{{ target_cluster }}_monitor" # on everybody but monitor server
+  become: true
+
+  vars: 
+    monitoring_server: "{{ hostvars[groups[target_cluster ~ '_monitor'][0]]['ansible_host'] }}"
+
+  tasks: 
+    - name: Set hostname to match inventory name
+      ansible.builtin.hostname:
+        name: "{{ inventory_hostname }}"
+    
+    - name: Zabbix server reachability check
+      ansible.builtin.command: "ping -q -c 5 -w 20 {{ monitoring_server }}"
+      register: server_reachable 
+      ignore_errors: true
+      changed_when: false
+
+    - name: Fail if zabbix server is unreachable
+      ansible.builtin.fail:
+        msg: "FATAL: server ({{ monitoring_server }}) is unreachable, monitoring can not be set up"
+      when: server_reachable.rc != 0
+
+    - name: Ensure Ubuntu default standard repositories are enabled
+      ansible.builtin.apt_repository:
+        repo: "{{ item }}"
+        state: present
+      loop:
+        - "deb http://archive.ubuntu.com/ubuntu/ {{ ansible_distribution_release }} main restricted universe multiverse"
+        - "deb http://archive.ubuntu.com/ubuntu/ {{ ansible_distribution_release }}-updates main restricted universe multiverse"
+        - "deb http://archive.ubuntu.com/ubuntu/ {{ ansible_distribution_release }}-security main restricted universe multiverse"
+
+    - name: Run apt-get update to fetch lists from new repositories
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Download zabbix repository configuration package
+      ansible.builtin.get_url:
+        url: https://repo.zabbix.com/zabbix/7.4/release/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.4+ubuntu24.04_all.deb
+        dest: /tmp/zabbix-release.deb
+
+    - name: Install zabbix repository
+      ansible.builtin.apt:
+        deb: /tmp/zabbix-release.deb
+        state: present
+
+    - name: Update apt cache and install zabbix agent
+      ansible.builtin.apt:
+        update_cache: yes
+        name: zabbix-agent
+        state: present
+
+    # Since we have ansible inventory in hierarchical fashion, it already knows what goes where and we don't have to
+    # do any additional referencing here
+    - name: Configure agent settings .conf file 
+      ansible.builtin.lineinfile:
+        path: /etc/zabbix/zabbix_agentd.conf
+        regexp: "{{ item.regex }}"
+        line: "{{ item.line }}"
+        state: present
+      loop:
+        - { regex: '^Server=', line: "Server={{ monitoring_server }}" }
+        - { regex: '^ServerActive=', line: "ServerActive={{ monitoring_server }}" }
+        - { regex: '^Hostname=', line: "Hostname={{ inventory_hostname }}" }
+
+    - name: Ensure zabbix agent is running and enabled
+      ansible.builtin.service:
+        name: zabbix-agent
+        state: restarted
+        enabled: true

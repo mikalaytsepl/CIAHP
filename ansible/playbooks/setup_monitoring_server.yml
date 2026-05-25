@@ -1,0 +1,193 @@
+---
+- name: "Setting up Zabbix monitoring server"
+  hosts: '{{ target_node }}'
+  become: true
+
+  vars:
+    dbpass_root: '{{ dbpass_root }}'
+    dbpass_zabbix: '{{ dbpass_zabbix }}'
+
+  tasks:
+    - name: Set hostname to match inventory name
+      ansible.builtin.hostname:
+        name: "{{ inventory_hostname }}"
+
+    - name: Ensure Ubuntu default standard repositories are enabled
+      ansible.builtin.apt_repository:
+        repo: "{{ item }}"
+        state: present
+      loop:
+        - "deb http://archive.ubuntu.com/ubuntu/ {{ ansible_distribution_release }} main restricted universe multiverse"
+        - "deb http://archive.ubuntu.com/ubuntu/ {{ ansible_distribution_release }}-updates main restricted universe multiverse"
+        - "deb http://archive.ubuntu.com/ubuntu/ {{ ansible_distribution_release }}-security main restricted universe multiverse"
+
+    - name: Run apt-get update to fetch lists from new repositories
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Install MySQL server
+      ansible.builtin.apt: 
+        name: mysql-server
+        state: present
+        lock_timeout: 300
+
+    - name: Wait for MySQL server to start listening on port 3306
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: 3306
+        state: started
+        timeout: 30
+
+    - name: Install mysql python package (required by Ansible mysql module)
+      ansible.builtin.apt:
+        name: python3-pymysql
+        state: present
+
+    - name: Get zabbix package file 
+      ansible.builtin.get_url:
+        url: https://repo.zabbix.com/zabbix/7.4/release/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.4+ubuntu24.04_all.deb
+        dest: /tmp/zabbix-release_latest_7.4+ubuntu24.04_all.deb
+
+    - name: Install deb file 
+      ansible.builtin.apt:
+        deb: /tmp/zabbix-release_latest_7.4+ubuntu24.04_all.deb
+        state: present
+
+    - name: Update packages and install core zabbix components
+      ansible.builtin.apt:
+        update_cache: yes
+        name:
+          - zabbix-server-mysql   
+          - zabbix-frontend-php
+          - zabbix-sql-scripts
+          - zabbix-apache-conf
+          - zabbix-agent
+        state: present
+        lock_timeout: 300
+
+    - name: Create zabbix db
+      community.mysql.mysql_db: 
+        name: zabbix
+        state: present 
+        encoding: utf8mb4
+        collation: utf8mb4_bin
+        login_user: root
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+    
+    - name: Create zabbix user for the db and grant privileges
+      community.mysql.mysql_user: 
+        name: zabbix 
+        password: '{{ dbpass_zabbix }}'
+        priv: "zabbix.*:ALL"
+        host: localhost 
+        state: present 
+        login_user: root
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+
+    # --- POPRAWIONY BLOK IMPORTU BAZY DANYCH ---
+    - name: Check if zabbix database has tables
+      ansible.builtin.shell: |
+        mysql -uroot -N -B -e "SHOW TABLES FROM zabbix LIKE 'users';"
+      register: db_check
+      changed_when: false
+
+    - name: Enable log_bin_trust_function_creators for database import
+      community.mysql.mysql_variables:
+        variable: log_bin_trust_function_creators
+        value: "1"
+        mode: global
+        login_user: root
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+      when: db_check.stdout == ""
+
+    - name: Import initial zabbix db schema
+      ansible.builtin.shell: |
+        set -o pipefail
+        zcat /usr/share/zabbix/sql-scripts/mysql/server.sql.gz | mysql --default-character-set=utf8mb4 -uzabbix -p'{{ dbpass_zabbix }}' zabbix
+      args:
+        executable: /bin/bash
+      when: db_check.stdout == ""
+      # no_log: true
+
+    - name: Disable log_bin_trust_function_creators after import
+      community.mysql.mysql_variables:
+        variable: log_bin_trust_function_creators
+        value: "0"
+        mode: global
+        login_user: root
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+      when: db_check.stdout == ""
+    # --------------------------------------------
+
+    - name: Configuring zabbix server constants in conf file
+      ansible.builtin.lineinfile:
+        path: /etc/zabbix/zabbix_server.conf
+        regexp: "{{ item.regex }}"
+        line: "{{ item.value }}"
+        state: present
+        backup: yes 
+      loop:
+        - { regex: '^#?\s*DBPassword=', value: "DBPassword={{ dbpass_zabbix }}" }
+        - { regex: '^#?\s*WebServiceURL=', value: 'WebServiceURL=http://localhost:10053/report' }
+        - { regex: '^#?\s*Timeout=', value: 'Timeout=30' }
+
+    - name: Installing zabbix web service package for pdf generation
+      ansible.builtin.apt: 
+        name:
+          - zabbix-web-service
+        state: present
+        lock_timeout: 300
+
+    - name: Removing standard chromium if installed to avoid permissions issues (apt)
+      ansible.builtin.apt: 
+        name:
+          - chromium-browser
+        state: absent
+
+    - name: Removing standard chromium if installed to avoid permissions issues (snap)
+      community.general.snap: 
+        name:
+          - chromium
+        state: absent
+
+    - name: Try installing Google Chrome from deb URL
+      ansible.builtin.apt:
+        deb: https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+        state: present
+      ignore_errors: true 
+      register: chrome_installation_result
+
+    - name: Force APT fix-broken to resolve dependencies and finish Chrome installation
+      ansible.builtin.command: apt-get install -f -y
+      when: chrome_installation_result.failed
+
+    - name: Change permissions and user for /var/lib/zabbix 
+      ansible.builtin.file: 
+        path: /var/lib/zabbix
+        owner: zabbix 
+        group: zabbix 
+        mode: '0775'
+        state: directory
+
+    - name: Set timeout in zabbix_web_service.conf
+      ansible.builtin.lineinfile:
+        path: /etc/zabbix/zabbix_web_service.conf
+        regexp: '^#?\s*Timeout='
+        line: 'Timeout=30'
+        state: present
+
+    - name: Restarting and enabling services 
+      ansible.builtin.service: 
+        name: '{{ item }}'
+        state: restarted 
+        enabled: true
+      loop:
+        - mysql         
+        - zabbix-server
+        - zabbix-agent
+        - zabbix-web-service
+        - apache2
+
+    - name: Force-reloading zabbix configuration cache
+      ansible.builtin.command: 
+        cmd: zabbix_server -R config_cache_reload

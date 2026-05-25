@@ -27,6 +27,7 @@ class InventoryManager():
                     "children": {
                         "global_managers": {"children": {}},
                         "global_workers": {"children": {}},
+                        "global_monitor": {"children": {}},
                         "clusters": {"children": {}}
                     }
                 }
@@ -79,7 +80,7 @@ class InventoryManager():
 
     # CRUD logic 
 
-    def add_host(self, name: str, ip: str, cluster_name: str, role: Literal["managers", "workers"]):
+    def add_host(self, name: str, ip: str, cluster_name: str, role: Literal["managers", "workers", "monitor"]):
             inv = self._load()
             
             # ensure global role exists 
@@ -90,6 +91,13 @@ class InventoryManager():
             cluster_root = all_children["clusters"]["children"].setdefault(cluster_name, {"children": {}})
             role_group_name = f"{cluster_name}_{role}"
             
+            if role == "monitor":
+                # check if monitoring group exists and if it does and have host inside, return this funciton without adding 
+                existing_role_group = cluster_root["children"].get(role_group_name)
+                if existing_role_group and len(existing_role_group.get("hosts", {})) >= 1:
+                    print(f"Warning: Cluster '{cluster_name}' already has a monitor node configured. Skipping insertion for {name} ({ip}).")
+                    return
+
             # add specific rule group to the cluster
             cluster_root["children"].setdefault(role_group_name, {"hosts": {}})
             
@@ -98,6 +106,7 @@ class InventoryManager():
 
             # Add the actual host data
             host_list = cluster_root["children"][role_group_name]["hosts"]
+
             
             # generate random suffix to ensure quniqueness
             suffix = ''.join(choices(string.ascii_lowercase + string.digits, k=5))
@@ -170,16 +179,14 @@ class InventoryManager():
         cluster_vars["control_plane_endpoint"] = f'{vip_address}:{endpoint_port}'
 
         self._save(inv)
-        print(f"Successfully set HA variables for '{cluster_name}' (VIP: {vip_address}, Endpoint: {vip_address}:{endpoint_port})")
+        print(f"Successfully set cluster variables for '{cluster_name}' (VIP: {vip_address}, Endpoint: {vip_address}:{endpoint_port})")
 
 
 if __name__ == '__main__':
     test = InventoryManager('/home/miko/CIAHP/ansible/inventory.yml')
-    test.add_host("main_manager","172.16.86.161","hardeningfwtest","managers")
-    test.add_host("second_manager","172.16.86.162","hardeningfwtest","managers")
-    test.add_host("first_worker","172.16.86.163","hardeningfwtest","workers")
-    test.add_host("second_worker","172.16.86.164","hardeningfwtest","workers")
+    test.add_host("main_manager","172.16.86.179","montest","managers")
+    test.add_host("monitor_server", "172.16.86.180", "montest","monitor")
     test.set_cluster_ha_vars(
-        cluster_name= "hardeningfwtest",
+        cluster_name= "montest",
         vip_address="172.16.86.185"
     )
