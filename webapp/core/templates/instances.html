@@ -105,6 +105,43 @@
     <div class="structure-panel">
       <div class="structure-panel__header">
         <span class="structure-panel__title">Klastry</span>
+        <button class="cluster-create-toggle" type="button" id="cluster-create-toggle">+ Dodaj nowy klaster</button>
+      </div>
+
+      <div class="cluster-create-panel" id="cluster-create-panel" hidden>
+        <form id="cluster-form" class="cluster-create-form">
+          <div class="cluster-create-grid">
+            <div class="form-field">
+              <label class="form-label" for="cluster-name">Nazwa klastra</label>
+              <input class="form-input" type="text" id="cluster-name" name="name" placeholder="np. prod-west" required>
+            </div>
+
+            <div class="form-field">
+              <label class="form-label" for="cluster-cidr">Cluster CIDR</label>
+              <input class="form-input" type="text" id="cluster-cidr" name="cluster_cidr" value="192.168.0.0/16" placeholder="192.168.0.0/16">
+            </div>
+
+            <div class="form-field">
+              <label class="form-label" for="cluster-vip">VIP address</label>
+              <input class="form-input" type="text" id="cluster-vip" name="vip_address" placeholder="opcjonalnie, np. 10.0.0.10">
+            </div>
+
+            <div class="form-field">
+              <label class="form-label" for="cluster-version">Kubernetes version</label>
+              <input class="form-input" type="text" id="cluster-version" name="kube_version" value="1.35" placeholder="1.35">
+            </div>
+          </div>
+
+          <p class="field-hint cluster-create-hint">Na start wystarczy nazwa. Węzły możesz dodać później z lewej strony, bez tworzenia hostów tutaj.</p>
+
+          <div class="cluster-create-actions">
+            <div id="cluster-form-error" class="field-error cluster-create-error" hidden></div>
+            <div class="cluster-create-buttons">
+              <button type="button" class="cluster-create-cancel" id="cluster-create-cancel">Anuluj</button>
+              <button type="submit" class="cluster-create-submit">Utwórz klaster</button>
+            </div>
+          </div>
+        </form>
       </div>
 
       {% for c in clusters %}
@@ -206,7 +243,7 @@
       </div>
       {% empty %}
       <div style="padding: 1.5rem; color: var(--text-muted); font-size: 0.85rem; text-align: center;">
-        Brak klastrów. Utwórz pierwszy przez <code>/api/docs/</code>.
+        Brak klastrów. Użyj przycisku „Dodaj nowy klaster” powyżej.
       </div>
       {% endfor %}
 

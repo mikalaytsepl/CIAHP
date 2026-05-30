@@ -71,6 +71,109 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  /* ── CREATE CLUSTER ── */
+  const clusterCreateToggle = document.getElementById('cluster-create-toggle');
+  const clusterCreatePanel  = document.getElementById('cluster-create-panel');
+  const clusterForm         = document.getElementById('cluster-form');
+  const clusterFormError    = document.getElementById('cluster-form-error');
+  const clusterCreateCancel = document.getElementById('cluster-create-cancel');
+  const clusterCreateSubmit = clusterForm ? clusterForm.querySelector('.cluster-create-submit') : null;
+
+  function setClusterFormError(message) {
+    if (!clusterFormError) return;
+    if (message) {
+      clusterFormError.textContent = message;
+      clusterFormError.hidden = false;
+    } else {
+      clusterFormError.textContent = '';
+      clusterFormError.hidden = true;
+    }
+  }
+
+  if (clusterCreateToggle && clusterCreatePanel && clusterForm) {
+    const openClusterForm = () => {
+      clusterCreatePanel.hidden = false;
+      clusterCreateToggle.textContent = 'Ukryj formularz';
+      clusterForm.querySelector('#cluster-name').focus();
+    };
+
+    const closeClusterForm = () => {
+      clusterCreatePanel.hidden = true;
+      clusterCreateToggle.textContent = '+ Dodaj nowy klaster';
+      clusterForm.reset();
+      clusterForm.querySelector('#cluster-cidr').value = '192.168.0.0/16';
+      clusterForm.querySelector('#cluster-version').value = '1.35';
+      setClusterFormError('');
+    };
+
+    clusterCreateToggle.addEventListener('click', () => {
+      if (clusterCreatePanel.hidden) {
+        openClusterForm();
+      } else {
+        closeClusterForm();
+      }
+    });
+
+    if (clusterCreateCancel) {
+      clusterCreateCancel.addEventListener('click', closeClusterForm);
+    }
+
+    clusterForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const name = clusterForm.querySelector('#cluster-name').value.trim();
+      const clusterCidr = clusterForm.querySelector('#cluster-cidr').value.trim() || '192.168.0.0/16';
+      const vipAddress = clusterForm.querySelector('#cluster-vip').value.trim();
+      const kubeVersion = clusterForm.querySelector('#cluster-version').value.trim() || '1.35';
+
+      if (!name) {
+        setClusterFormError('Podaj nazwę klastra.');
+        return;
+      }
+
+      if (clusterCreateSubmit) {
+        clusterCreateSubmit.disabled = true;
+        clusterCreateSubmit.textContent = 'Tworzenie…';
+      }
+      setClusterFormError('');
+
+      const body = {
+        name,
+        cluster_cidr: clusterCidr,
+        kube_version: kubeVersion,
+      };
+      if (vipAddress) {
+        body.vip_address = vipAddress;
+      }
+
+      try {
+        const resp = await fetch('/api/clusters/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrf(),
+          },
+          body: JSON.stringify(body),
+        });
+
+        if (resp.ok) {
+          window.location.reload();
+          return;
+        }
+
+        const data = await resp.json().catch(() => ({}));
+        setClusterFormError(data.detail || `Błąd serwera (${resp.status}).`);
+      } catch (err) {
+        setClusterFormError(`Błąd połączenia: ${err.message}`);
+      } finally {
+        if (clusterCreateSubmit) {
+          clusterCreateSubmit.disabled = false;
+          clusterCreateSubmit.textContent = 'Utwórz klaster';
+        }
+      }
+    });
+  }
+
   /* ── FORM SUBMIT → API ── */
   const form       = document.getElementById('instance-form');
   const submitBtn  = form.querySelector('.submit-btn');
