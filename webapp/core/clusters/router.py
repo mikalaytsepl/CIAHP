@@ -131,9 +131,8 @@ def add_node_endpoint(request, cluster_name: str, body: NodeIn):
     if body.role not in ("manager", "worker"):
         raise HttpError(400, "role must be 'manager' or 'worker'.")
 
-    # Validate the optional access bundle BEFORE creating anything, so a bad
-    # request doesn't leave an orphaned node behind.
-    _validate_access(body)
+    # Validate the optional bootstrap bundle BEFORE creating anything.
+    _validate_bootstrap(body)
 
     try:
         node = add_node(
@@ -146,31 +145,59 @@ def add_node_endpoint(request, cluster_name: str, body: NodeIn):
     except ValueError as e:
         raise HttpError(400, str(e))
 
-    # After a successful deploy, optionally provision the operator's login account.
-    on_success = _make_access_provision(node.name, body) if body.access_user else None
-
-    # Trigger the appropriate playbook immediately after registering the node
+    # Build the deploy step — runs either directly (ansible already on the box)
+    # or chained after a successful bootstrap.
     if node.role == "manager":
         existing_managers = cluster.nodes.filter(role="manager").exclude(id=node.id).count()
         if existing_managers == 0:
-            op = run_playbook("deploy_main_manager.yml", {
+            deploy_playbook = "deploy_main_manager.yml"
+            deploy_extra = {
                 "target_cluster": cluster_name,
                 "cluster_cidr":   cluster.cluster_cidr,
                 "kube_version":   cluster.kube_version,
                 "node_id":        node.id,
-            }, on_success=on_success)
+            }
         else:
-            op = run_playbook("deploy_additional_manager.yml", {
+            deploy_playbook = "deploy_additional_manager.yml"
+            deploy_extra = {
                 "target_cluster": cluster_name,
                 "target_node":    node.name,
                 "node_id":        node.id,
-            }, on_success=on_success)
+            }
     else:
-        op = run_playbook("deploy_worker.yml", {
+        deploy_playbook = "deploy_worker.yml"
+        deploy_extra = {
             "target_cluster": cluster_name,
             "target_node":    node.name,
             "node_id":        node.id,
-        }, on_success=on_success)
+        }
+
+    cn, nn = cluster_name, node.name
+
+    if body.bootstrap_user and body.bootstrap_user.strip():
+        # Step 1: create the `ansible` service account on the fresh machine,
+        # connecting as the operator's existing admin (sshpass + ad-hoc inventory).
+        initial_user = body.bootstrap_user.strip()
+        password     = body.bootstrap_password or ""
+        ip           = body.ip
+
+        def _chain_deploy():
+            # Step 2: normal deploy, now as `ansible`.
+            run_playbook(deploy_playbook, deploy_extra)
+
+        op = run_playbook(
+            "propagate_ansible.yml",
+            {"target_node": ip, "initial_user": initial_user},
+            env={"SSHPASS": password},
+            inventory=f"{ip},",
+            on_success=_chain_deploy,
+            # Bootstrap failure = nothing was installed on the machine, so undo
+            # the node registration too. No orphan to manually delete; the
+            # failed Operation stays as audit trail.
+            on_failure=lambda: purge_node_record(cn, nn),
+        )
+    else:
+        op = run_playbook(deploy_playbook, deploy_extra)
 
     return NodeDeployOut(
         id=node.id, name=node.name, ip=node.ip,
@@ -179,39 +206,12 @@ def add_node_endpoint(request, cluster_name: str, body: NodeIn):
     )
 
 
-def _validate_access(body: NodeIn) -> None:
-    """Validate the optional access-provisioning bundle. Raises HttpError(400) if invalid."""
-    if not (body.access_user and body.access_user.strip()):
-        return  # provisioning is optional — nothing to validate
-    if body.auth_method not in ("password", "key"):
-        raise HttpError(400, "auth_method musi być 'password' albo 'key'.")
-    if body.auth_method == "key" and not (body.public_key and body.public_key.strip()):
-        raise HttpError(400, "Metoda 'key' wymaga klucza publicznego.")
-    if body.auth_method == "password" and not body.access_password:
-        raise HttpError(400, "Metoda 'password' wymaga hasła.")
-
-
-def _make_access_provision(node_name: str, body: NodeIn):
-    """Build an on_success callback that provisions the operator's login account.
-
-    The password (if any) is passed via an environment variable so it never
-    lands in --extra-vars (which is persisted in the Operation record).
-    """
-    user = body.access_user.strip()
-    method = body.auth_method
-    pubkey = (body.public_key or "").strip()
-    password = body.access_password or ""
-
-    def _provision():
-        extra = {"target_node": node_name, "access_user": user, "auth_method": method}
-        env = None
-        if method == "key":
-            extra["public_key"] = pubkey
-        else:
-            env = {"CIAHP_ACCESS_PW": password}
-        run_playbook("provision_access.yml", extra, env=env)
-
-    return _provision
+def _validate_bootstrap(body: NodeIn) -> None:
+    """If a bootstrap user is provided, a password is required (password-only auth)."""
+    if not (body.bootstrap_user and body.bootstrap_user.strip()):
+        return  # bootstrap is optional — caller assumes `ansible` is already on the box
+    if not body.bootstrap_password:
+        raise HttpError(400, "Bootstrap konta wymaga hasła dla podanego użytkownika.")
 
 
 @clusters_router.delete(

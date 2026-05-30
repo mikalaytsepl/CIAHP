@@ -49,11 +49,12 @@ class NodeIn(Schema):
     ip:            str
     role:          str   # "manager" | "worker"
     validate_host: bool = False
-    # Optional: provision a human admin login on the node after a successful deploy.
-    access_user:     Optional[str] = None
-    auth_method:     Optional[str] = None   # "password" | "key"
-    access_password: Optional[str] = None   # used when auth_method == "password"
-    public_key:      Optional[str] = None   # used when auth_method == "key"
+    # Optional: one-time bootstrap of the `ansible` service account on a fresh
+    # machine, using credentials of an existing admin (e.g. the user who built
+    # the VM). Used ONCE — afterwards everything runs as `ansible`. Password-only
+    # for now; password travels via SSHPASS env, never argv/extra-vars/logs.
+    bootstrap_user:     Optional[str] = None
+    bootstrap_password: Optional[str] = None
 
 
 class NodeDeployOut(Schema):
