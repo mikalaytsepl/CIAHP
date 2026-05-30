@@ -57,20 +57,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  /* ── AUTH METHOD ── */
-  const authCards = document.querySelectorAll('.auth-card');
-  const authInput = document.getElementById('auth-method-value');
-
-  authCards.forEach(card => {
-    card.addEventListener('click', () => {
-      authCards.forEach(c => c.classList.remove('active'));
-      card.classList.add('active');
-      authInput.value = card.dataset.method;
-      document.querySelectorAll('.auth-fields').forEach(f => f.classList.remove('visible'));
-      document.getElementById('auth-' + card.dataset.method).classList.add('visible');
-    });
-  });
-
   /* ── CLUSTER COLLAPSE ── */
   document.querySelectorAll('.cluster-row').forEach(row => {
     row.addEventListener('click', () => {
@@ -118,31 +104,18 @@ document.addEventListener('DOMContentLoaded', () => {
       role: roleInput.value,
     };
 
-    // Optional: provision a login account on the node after deploy.
-    const accessUser = document.getElementById('inst-user').value.trim();
-    if (accessUser) {
-      const method = authInput.value;            // 'password' | 'key'
-      body.access_user = accessUser;
-      body.auth_method = method;
-      if (method === 'key') {
-        const pubkey = document.getElementById('inst-pubkey').value.trim();
-        if (!pubkey) {
-          formError.textContent = 'Metoda „Klucz" wymaga klucza publicznego.';
-          formError.style.display = 'block';
-          submitBtn.disabled = false; submitBtn.innerHTML = origBtnHTML;
-          return;
-        }
-        body.public_key = pubkey;
-      } else {
-        const pass = document.getElementById('inst-pass').value;
-        if (!pass) {
-          formError.textContent = 'Metoda „Hasło" wymaga hasła.';
-          formError.style.display = 'block';
-          submitBtn.disabled = false; submitBtn.innerHTML = origBtnHTML;
-          return;
-        }
-        body.access_password = pass;
+    // Optional: one-time bootstrap of `ansible` using an existing admin's creds.
+    const bootstrapUser = document.getElementById('inst-user').value.trim();
+    if (bootstrapUser) {
+      const pass = document.getElementById('inst-pass').value;
+      if (!pass) {
+        formError.textContent = 'Podaj hasło dla podanego konta startowego.';
+        formError.style.display = 'block';
+        submitBtn.disabled = false; submitBtn.innerHTML = origBtnHTML;
+        return;
       }
+      body.bootstrap_user     = bootstrapUser;
+      body.bootstrap_password = pass;
     }
 
     try {

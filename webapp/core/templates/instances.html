@@ -65,44 +65,17 @@
           </select>
         </div>
 
-        <!-- Access user (shared for both methods) -->
+        <!-- One-time bootstrap credentials (existing admin on the fresh machine) -->
         <div class="form-field">
-          <label class="form-label" for="inst-user">Użytkownik dostępowy (konto admin na węźle)</label>
-          <input class="form-input" type="text" id="inst-user" name="username" placeholder="np. devops" autocomplete="off">
-          <span class="field-hint">Opcjonalne — konto zakładane po wdrożeniu, do logowania SSH na ten węzeł (z sudo).</span>
+          <label class="form-label" for="inst-user">Istniejące konto admina na maszynie</label>
+          <input class="form-input" type="text" id="inst-user" name="username" placeholder="np. ubuntu, kali" autocomplete="off">
+          <span class="field-hint">Opcjonalne. Użyte <strong>jednorazowo</strong> do założenia konta <code>ansible</code>. Pomiń, jeśli <code>ansible</code> już istnieje na maszynie.</span>
         </div>
 
-        <!-- Authentication method -->
         <div class="form-field">
-          <label class="form-label">Metoda Uwierzytelniania</label>
-          <div class="auth-methods">
-            <div class="auth-card active" data-method="password">
-              <span class="auth-card__title">Hasło</span>
-              <span class="auth-card__sub">Logowanie hasłem</span>
-            </div>
-            <div class="auth-card" data-method="key">
-              <span class="auth-card__title">Klucz Publiczny</span>
-              <span class="auth-card__sub">Klucz RSA / ED25519</span>
-            </div>
-          </div>
-          <input type="hidden" id="auth-method-value" name="auth_method" value="password">
-        </div>
-
-        <!-- Fields: Password -->
-        <div class="auth-fields visible" id="auth-password">
-          <div class="form-field" style="margin-bottom:0;">
-            <label class="form-label" for="inst-pass">Hasło</label>
-            <input class="form-input" type="password" id="inst-pass" name="password" placeholder="••••••••" autocomplete="new-password">
-          </div>
-        </div>
-
-        <!-- Fields: Public key -->
-        <div class="auth-fields" id="auth-key">
-          <div class="form-field" style="margin-bottom:0;">
-            <label class="form-label" for="inst-pubkey">Klucz Publiczny</label>
-            <textarea class="form-input form-textarea" id="inst-pubkey" name="public_key"
-                      placeholder="ssh-rsa AAAA… lub ssh-ed25519 AAAA…"></textarea>
-          </div>
+          <label class="form-label" for="inst-pass">Hasło tego konta</label>
+          <input class="form-input" type="password" id="inst-pass" name="password" placeholder="••••••••" autocomplete="new-password">
+          <span class="field-hint">Wymagane, jeśli podałeś użytkownika powyżej. Nie jest zapisywane.</span>
         </div>
 
         <!-- API error feedback -->
