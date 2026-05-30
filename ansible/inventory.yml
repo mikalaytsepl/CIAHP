@@ -2,30 +2,29 @@ all:
     children:
         global_managers:
             children:
-                test-cluster_managers: {}
-                k8s-cluster_managers: {}
+                montest_managers: {}
         global_workers:
             children:
-                test-cluster_workers: {}
+                montest_workers: {}
+        global_monitor:
+            children:
+                montest_monitor: {}
         clusters:
             children:
-                test-cluster:
+                montest:
                     children:
-                        test-cluster_workers:
-                            hosts: {}
-                        test-cluster_managers:
-                            hosts: {}
-                k8s-cluster:
-                    children:
-                        k8s-cluster_managers:
+                        montest_managers:
                             hosts:
-                                man1-g1jr3:
-                                    ansible_host: 192.168.100.12
+                                main-manager-8fo4e:
+                                    ansible_host: 172.16.86.181
+                        montest_workers:
+                            hosts:
+                                worker-4jbs9:
+                                    ansible_host: 172.16.86.182
+                        montest_monitor:
+                            hosts:
+                                monitor-server-b86ao:
+                                    ansible_host: 172.16.86.183
                     vars:
-                        cluster_vip: 192.168.100.100
-                        control_plane_endpoint: 192.168.100.100:8443
-                testcluster:
-                    children: {}
-                    vars:
-                        cluster_vip: 192.168.0.0
-                        control_plane_endpoint: 192.168.0.0:8443
+                        cluster_vip: 172.16.86.185
+                        control_plane_endpoint: 172.16.86.185:8443

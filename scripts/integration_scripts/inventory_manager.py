@@ -79,14 +79,10 @@ class InventoryManager():
 
     # CRUD logic 
 
-<<<<<<< HEAD
-    def add_host(self, name: str, ip: str, cluster_name: str, role: Literal["managers", "workers", "monitor"]):
-=======
-    def add_host(self, name: str, ip: str, cluster_name: str, role: Literal["managers", "workers"], validate: bool = False) -> str:
+    def add_host(self, name: str, ip: str, cluster_name: str, role: Literal["managers", "workers", "monitor"], validate: bool = False) -> str:
             if validate:
                 self._validate_host(ip)
 
->>>>>>> frontend
             inv = self._load()
             
             # ensure global role exists 
@@ -112,7 +108,6 @@ class InventoryManager():
 
             # Add the actual host data
             host_list = cluster_root["children"][role_group_name]["hosts"]
-
             
             # generate random suffix to ensure uniqueness
             suffix = ''.join(choices(string.ascii_lowercase + string.digits, k=5))
@@ -191,15 +186,9 @@ class InventoryManager():
 
 if __name__ == '__main__':
     test = InventoryManager('/home/miko/CIAHP/ansible/inventory.yml')
-<<<<<<< HEAD
-    test.add_host("main_manager","172.16.86.179","montest","managers")
-    test.add_host("monitor_server", "172.16.86.180", "montest","monitor")
-=======
-    test.add_host("main_manager","172.16.86.169","hardeningfwtest","managers")
-    test.add_host("second_manager","172.16.86.170","hardeningfwtest","managers")
-    test.add_host("first_worker","172.16.86.171","hardeningfwtest","workers")
-    test.add_host("second_worker","172.16.86.172","hardeningfwtest","workers")
->>>>>>> frontend
+    test.add_host("main_manager","172.16.86.181","montest","managers")
+    test.add_host("worker", "172.16.86.182", "montest","workers")
+    test.add_host("monitor_server", "172.16.86.183", "montest","monitor")
     test.set_cluster_ha_vars(
         cluster_name= "montest",
         vip_address="172.16.86.185"
