@@ -3,13 +3,15 @@
   ansible.builtin.command: dpkg --configure -a
   become: true
   ignore_errors: true
+  changed_when: false
 
 - name: Reset k8s cluster state
   ansible.builtin.command: "kubeadm reset -f"
   register: kubeadm_reset
   ignore_errors: true
+  changed_when: false
 
-- name: Stop and disable container and HA services
+- name: Stop and disable container, HA, and supplementary services
   ansible.builtin.systemd:
     name: "{{ item }}"
     state: stopped
@@ -18,9 +20,16 @@
     - containerd
     - haproxy
     - keepalived
+    - zabbix-agent
+    - nftables
   ignore_errors: true
 
-- name: Remove Kubernetes, container, and HA packages
+- name: Flush nftables firewall rules
+  ansible.builtin.command: nft flush ruleset
+  ignore_errors: true
+  changed_when: false
+
+- name: Remove Kubernetes, container, HA, and supplementary packages
   ansible.builtin.apt:
     name:
       - kubelet
@@ -30,18 +39,60 @@
       - containerd
       - haproxy
       - keepalived
+      - zabbix-agent
+      - zabbix-release
+      - trivy
+      - lynis
+      - k6
+      - nftables
+      - python3-kubernetes
     state: absent
     autoremove: yes
     purge: yes
     lock_timeout: 120
     allow_change_held_packages: true
 
-- name: Remove Kubernetes apt repository
+- name: Remove Kubernetes and supplementary apt repositories
   ansible.builtin.apt_repository:
-    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.asc] https://pkgs.k8s.io/core:/stable:/v{{ KUBE_VERSION | default('1.35') }}/deb/ /"
+    repo: "{{ item }}"
     state: absent
+  loop:
+    - "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.asc] https://pkgs.k8s.io/core:/stable:/v{{ KUBE_VERSION | default('1.35') }}/deb/ /"
+    - "deb https://dl.k6.io/deb stable main"
+    - "deb [signed-by=/etc/apt/keyrings/trivy.asc] https://aquasecurity.github.io/trivy-repo/deb {{ ansible_distribution_release | default('jammy') }} main"
 
-- name: Remove configuration directories and files
+- name: Parse the original users-list.txt file to identify managed users
+  ansible.builtin.set_fact:
+    managed_users_to_remove: >-
+      {{
+        lookup('file', '../users-list.txt', errors='ignore') | default('') | splitlines()
+        | reject('match', '^#')
+        | reject('match', '^\\s*$')
+        | map('split', ',')
+        | map('first')
+        | map('trim')
+        | list
+      }}
+  ignore_errors: true
+  changed_when: false
+
+- name: Remove managed human users and their home directories
+  ansible.builtin.user:
+    name: "{{ item }}"
+    state: absent
+    remove: yes
+    force: yes
+  loop: "{{ managed_users_to_remove | default([]) }}"
+  ignore_errors: true
+
+- name: Remove passwordless sudo privileges for managed users
+  ansible.builtin.file:
+    path: "/etc/sudoers.d/{{ item }}"
+    state: absent
+  loop: "{{ managed_users_to_remove | default([]) }}"
+  ignore_errors: true
+
+- name: Remove configuration directories and leftover files
   ansible.builtin.file:
     path: "{{ item }}"
     state: absent
@@ -54,10 +105,34 @@
     - /etc/containerd
     - /etc/haproxy
     - /etc/keepalived
-    - /etc/apt/keyrings/kubernetes-apt-keyring.gpg  # For broken runs
+    - /etc/apt/keyrings/kubernetes-apt-keyring.gpg
     - /etc/apt/keyrings/kubernetes-apt-keyring.asc
+    - /etc/apt/keyrings/trivy.asc
     - /root/.kube
     - /home/ansible/.kube
+    - /home/ansible/audit
+    - /etc/zabbix
+    - /etc/nftables.conf
+    - /tmp/nftables_new.conf
+    - /etc/sysctl.d/kubernetes.conf
+    - /etc/modules-load.d/containerd.conf
+    - /tmp/load_test.js
+    - /tmp/k6_summary.json
+    - /tmp/k6_output.txt
+
+- name: Remove kernel modules loaded for Kubernetes
+  ansible.builtin.command: modprobe -r {{ item }}
+  loop:
+    - br_netfilter
+    - overlay
+  ignore_errors: true
+  changed_when: false
+
+- name: Clean up modified hostname entry in /etc/hosts
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1\s+{{ inventory_hostname }}'
+    state: absent
 
 - name: Clean up lingering CNI network interfaces
   ansible.builtin.shell: |

@@ -10,7 +10,5 @@
   handlers:
     - name: Restart SSH Service
       ansible.builtin.systemd:
-        name: sshd
-        state: restarted
-
-    # - name: Restart Auditd
+        name: ssh
+        state: reloaded   # Fix for edge case with ssh hardening

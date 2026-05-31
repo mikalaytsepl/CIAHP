@@ -10,6 +10,7 @@
         name: lynis
         state: present 
         update_cache: yes
+        lock_timeout: 300   # Fix for "unable to aquire lock"; Works as in all other playbooks
 
     - name: Get time and date for report 
       ansible.builtin.command: date +%m-%d-%y-%H-%M
