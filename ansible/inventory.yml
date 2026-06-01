@@ -2,24 +2,20 @@ all:
     children:
         global_managers:
             children:
-                ui-test_managers: {}
+                anothertest_managers: {}
         global_workers:
             children:
-                ui-test_workers: {}
+                anothertest_workers: {}
         global_monitor:
             children: {}
         clusters:
             children:
-                ui-test:
+                anothertest:
                     children:
-                        ui-test_managers:
-                            hosts:
-                                main-manager-olchv:
-                                    ansible_host: 172.16.86.185
-                        ui-test_workers:
-                            hosts:
-                                main-worker-w7rho:
-                                    ansible_host: 172.16.86.186
+                        anothertest_managers:
+                            hosts: {}
+                        anothertest_workers:
+                            hosts: {}
                     vars:
-                        cluster_vip: 172.16.86.199
-                        control_plane_endpoint: 172.16.86.199:8443
+                        cluster_vip: 172.16.86.200
+                        control_plane_endpoint: 172.16.86.200:8443

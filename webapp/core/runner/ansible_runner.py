@@ -1,6 +1,8 @@
 import json
+import os
 import subprocess
 import threading
+import time
 from pathlib import Path
 
 from django.conf import settings
@@ -9,6 +11,10 @@ from django.utils import timezone
 
 def _get_ansible_dir() -> Path:
     return Path(settings.ANSIBLE_DIR)
+
+
+def _get_tmp_runs_dir() -> Path:
+    return _get_ansible_dir() / "tmpruns"
 
 
 def _to_extra_vars_str(d: dict) -> str:
@@ -59,7 +65,10 @@ def _execute(op_id, playbook: str, extra_vars: dict, on_success=None, on_failure
     op.save(update_fields=["status", "started_at"])
 
     ansible_dir = _get_ansible_dir()
+    tmp_runs_dir = _get_tmp_runs_dir()
+    tmp_runs_dir.mkdir(parents=True, exist_ok=True)
     inventory_arg = inventory if inventory else str(settings.INVENTORY_FILE)
+    tmp_marker = tmp_runs_dir / f"instance-{int(time.time())}.tmp"
 
     # node_id is internal tracking — strip it before passing to ansible-playbook
     node_id = extra_vars.get("node_id")
@@ -112,6 +121,23 @@ def _execute(op_id, playbook: str, extra_vars: dict, on_success=None, on_failure
             cmd += ["--ssh-extra-args=-o PreferredAuthentications=password -o PubkeyAuthentication=no"]
 
     try:
+        tmp_marker.write_text(
+            json.dumps(
+                {
+                    "operation_id": str(op.id),
+                    "playbook": playbook,
+                    "inventory": inventory_arg,
+                    "started_at": timezone.now().isoformat(),
+                    "extra_vars": ansible_vars,
+                    "command": cmd,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
         result = subprocess.run(
             cmd,
             capture_output=True,
@@ -129,12 +155,31 @@ def _execute(op_id, playbook: str, extra_vars: dict, on_success=None, on_failure
         op.stderr = str(exc)
         op.return_code = -1
         op.status = Operation.Status.FAILED
+        try:
+            tmp_marker.write_text(
+                json.dumps(
+                    {
+                        "operation_id": str(op.id),
+                        "playbook": playbook,
+                        "inventory": inventory_arg,
+                        "started_at": timezone.now().isoformat(),
+                        "extra_vars": ansible_vars,
+                        "error": str(exc),
+                        "command": cmd,
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+        except Exception:
+            pass
     finally:
-        import os as _os
         for _f in (conn_pass_file, become_pass_file):
             if _f:
                 try:
-                    _os.unlink(_f)
+                    os.unlink(_f)
                 except Exception:
                     pass
 
@@ -165,3 +210,11 @@ def _execute(op_id, playbook: str, extra_vars: dict, on_success=None, on_failure
             callback()
         except Exception as e:
             print(f"[runner] completion callback failed for op {op_id}: {e}")
+
+    if op.status == Operation.Status.SUCCESS:
+        try:
+            tmp_marker.unlink()
+        except FileNotFoundError:
+            pass
+        except Exception as e:
+            print(f"[runner] failed to remove tmp marker {tmp_marker}: {e}")
